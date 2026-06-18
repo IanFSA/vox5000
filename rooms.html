@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Rooms — Vox5000</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo"><img src="logo.png" alt="VOX5000" class="logo-img" /></div>
+    </div>
+  </header>
+  <main class="main">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <h1 style="font-size:22px; font-weight:600; letter-spacing:-0.02em;">My Rooms</h1>
+      <a href="room.html" class="btn btn-record" style="text-decoration:none; font-size:13px; padding:8px 14px;">+ New Room</a>
+    </div>
+    <p style="font-size:14px; color:var(--text2); margin-bottom:20px;">Rooms are stored in your browser. They persist until you delete them.</p>
+    <div id="roomsList"></div>
+    <div id="noRooms" style="display:none;" class="card" >
+      <p style="font-size:14px; color:var(--text2); text-align:center; padding:20px 0;">No rooms yet. <a href="room.html" style="color:var(--yellow);">Create your first room.</a></p>
+    </div>
+    <div style="margin-top:20px;">
+      <a href="index.html" class="btn btn-ghost" style="text-decoration:none; font-size:13px;">← Back to recorder</a>
+    </div>
+  </main>
+  <script>
+    function getRooms() { try { return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}'); } catch { return {}; } }
+    function saveRooms(r) { localStorage.setItem('vox5000_rooms', JSON.stringify(r)); }
+    function render() {
+      const rooms = getRooms();
+      const list = $('roomsList'), none = $('noRooms');
+      const keys = Object.keys(rooms);
+      if (keys.length === 0) { list.innerHTML=''; none.style.display='block'; return; }
+      none.style.display='none';
+      list.innerHTML = keys.map(id => {
+        const r = rooms[id];
+        const date = r.created ? new Date(r.created).toLocaleDateString() : 'Unknown';
+        return `
+          <div class="card" style="margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:15px; font-weight:500; color:var(--text); margin-bottom:4px;">${r.name||'Interview Room'}</div>
+              <div style="font-family:var(--mono); font-size:12px; color:var(--yellow);">${id}</div>
+              <div style="font-size:12px; color:var(--text3); margin-top:4px;">Created ${date}</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <a href="room.html?r=${id}" class="btn btn-ghost" style="text-decoration:none; font-size:13px; padding:7px 12px;">Open</a>
+              <button onclick="copyLink('${id}')" class="btn btn-ghost" style="font-size:13px; padding:7px 12px;">Copy link</button>
+              <button onclick="deleteRoom('${id}')" class="btn btn-ghost" style="font-size:13px; padding:7px 12px; color:#FF4444; border-color:rgba(255,68,68,0.3);">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    window.deleteRoom = function(id) {
+      if (confirm('Delete this room?')) { const r=getRooms(); delete r[id]; saveRooms(r); render(); }
+    };
+    window.copyLink = function(id) {
+      navigator.clipboard.writeText(`${location.origin}${location.pathname.replace('rooms.html','room.html')}?r=${id}`).then(()=>alert('Link copied!'));
+    };
+    function $(id){return document.getElementById(id);}
+    render();
+  </script>
+</body>
+</html>

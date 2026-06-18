@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vox5000 — Interview Room</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="room.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <img src="logo.png" alt="VOX5000" class="logo-img" />
+      </div>
+      <div class="on-air" id="onAir">
+        <span class="on-air-dot"></span>
+        <span>ON AIR</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAME ENTRY SCREEN -->
+  <div class="screen" id="nameScreen">
+    <div class="screen-card">
+      <div class="screen-logo">
+        <img src="logo.png" alt="VOX5000" style="height:32px;" />
+      </div>
+      <h2 class="screen-title">You've been invited to an interview</h2>
+      <p class="screen-sub">Enter your name — this will be used to label your audio track.</p>
+      <div class="name-input-wrap">
+        <input type="text" id="participantName" class="name-input" placeholder="Your full name" maxlength="40" autocomplete="off" />
+      </div>
+      <div id="nameError" class="name-error" style="display:none;">Please enter your name to continue.</div>
+      <button class="btn btn-record" id="enterRoomBtn" style="width:100%; justify-content:center; margin-top:8px;">
+        Enter Room
+      </button>
+      <p class="screen-note">By entering you consent to being recorded during this session.</p>
+    </div>
+  </div>
+
+  <!-- WAITING ROOM (guests only) -->
+  <div class="screen" id="waitingScreen" style="display:none;">
+    <div class="screen-card">
+      <div class="screen-logo"><img src="logo.png" alt="VOX5000" style="height:32px;" /></div>
+      <h2 class="screen-title">Waiting to be admitted</h2>
+      <p class="screen-sub">The host will let you in shortly. Make sure your microphone is ready.</p>
+      <div class="waiting-spinner"></div>
+      <p class="screen-note" id="waitingName"></p>
+    </div>
+  </div>
+
+  <!-- MAIN ROOM -->
+  <div class="screen" id="roomScreen" style="display:none;">
+    <main class="room-main">
+
+      <!-- Room header bar -->
+      <div class="room-topbar">
+        <div class="room-info">
+          <span class="room-label">Room</span>
+          <span class="room-code" id="roomCodeDisplay"></span>
+        </div>
+        <div class="room-topbar-actions">
+          <button class="btn btn-ghost btn-sm" id="copyLinkBtn">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 4V3a1 1 0 00-1-1H3a1 1 0 00-1 1v6a1 1 0 001 1h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Copy invite link
+          </button>
+          <button class="btn btn-ghost btn-sm" id="renameRoomBtn">Rename</button>
+          <button class="btn btn-ghost btn-sm" id="deleteRoomBtn" style="color:#FF4444; border-color:rgba(255,68,68,0.3);">Delete room</button>
+        </div>
+      </div>
+
+      <div class="room-grid">
+
+        <!-- LEFT: Participants + controls -->
+        <div class="room-left">
+
+          <!-- Participants -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-label">Participants <span id="participantCount" style="color:var(--yellow);">0/4</span></div>
+            <div class="participants-list" id="participantsList"></div>
+
+            <!-- Waiting room queue (host only) -->
+            <div id="waitingQueue" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+              <div class="card-label" style="margin-bottom:10px;">Waiting to join</div>
+              <div id="waitingList"></div>
+            </div>
+          </div>
+
+          <!-- Recording controls -->
+          <div class="card recorder-card">
+            <div class="duration-display">
+              <span class="duration" id="duration">00:00:00</span>
+              <span class="duration-status" id="durStatus">Ready</span>
+            </div>
+            <div class="controls" style="margin-bottom:16px;">
+              <button class="btn btn-record" id="recBtn">
+                <span class="rec-dot"></span> Record
+              </button>
+              <button class="btn btn-ghost" id="pauseBtn" disabled>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="3.5" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="2" width="3.5" height="10" rx="1" fill="currentColor"/></svg>
+                Pause
+              </button>
+            </div>
+            <div class="markers">
+              <span class="markers-label">Mark</span>
+              <button class="btn btn-marker" id="m1" disabled>Intro</button>
+              <button class="btn btn-marker" id="m2" disabled>Break</button>
+              <button class="btn btn-marker" id="m3" disabled>Outro</button>
+              <button class="btn btn-marker" id="m4" disabled>Clip</button>
+            </div>
+            <div class="marker-log" id="markerLog"></div>
+          </div>
+
+          <!-- Transfer progress (shown after recording ends) -->
+          <div class="card" id="transferCard" style="display:none; margin-top:16px;">
+            <div class="card-label">Collecting tracks</div>
+            <div id="transferList"></div>
+            <div id="transferNote" class="screen-note" style="margin-top:12px;">Keep this page open until all tracks are received.</div>
+          </div>
+
+          <!-- Downloads -->
+          <div class="card downloads" id="dlSection" style="display:none; margin-top:16px;">
+            <div class="card-label">Downloads ready</div>
+            <div class="dl-grid" id="dlGrid"></div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT: Waveform + Chat -->
+        <div class="room-right">
+
+          <!-- Waveform -->
+          <div class="waveform-section" style="margin-bottom:16px;">
+            <div class="wave-header">
+              <span class="wave-title">Waveform Monitor</span>
+              <span class="wave-hint">Red = clipping</span>
+            </div>
+            <canvas id="waveCanvas" class="wave-canvas" height="120"></canvas>
+          </div>
+
+          <!-- Chat -->
+          <div class="card chat-card">
+            <div class="card-label">Chat</div>
+            <div class="chat-messages" id="chatMessages">
+              <div class="chat-system">Chat is active. Use this if audio isn't working.</div>
+            </div>
+            <div class="chat-input-row">
+              <input type="text" id="chatInput" class="chat-input" placeholder="Type a message…" maxlength="300" />
+              <button class="btn btn-record btn-sm" id="chatSend" style="flex-shrink:0;">Send</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Hidden audio elements for remote streams -->
+  <div id="audioElements" style="display:none;"></div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="room.js"></script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vox5000 — Broadcast Audio Recorder</title>
+  <meta name="description" content="Free broadcast-quality audio recorder. WAV or MP3, multiple quality settings, level controls, real-time waveform. No account. No cloud." />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <img src="logo.png" alt="VOX5000" class="logo-img" />
+      </div>
+      <div class="on-air" id="onAir" aria-live="polite">
+        <span class="on-air-dot"></span>
+        <span>ON AIR</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="hero">
+      <h1 class="hero-title">Broadcast Quality Audio.</h1>
+      <p class="hero-sub">WAV or MP3 recording in your browser.</p>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px;">
+        <a href="room.html" class="btn btn-record" style="text-decoration:none;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M5 7h4M7 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Start Interview Room
+        </a>
+        <a href="rooms.html" class="btn btn-ghost" style="text-decoration:none;">My Rooms</a>
+      </div>
+    </section>
+
+    <div class="notice-bar" id="permNotice">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+      Allow microphone access when your browser asks, then select your mic below.
+    </div>
+
+    <!-- Mic + Format -->
+    <section class="card" aria-label="Microphone and format setup">
+      <div class="card-label">Input & format</div>
+      <div class="control-row">
+        <label for="micSelect" class="field-label">Mic</label>
+        <select id="micSelect" class="select"></select>
+      </div>
+      <div class="control-row">
+        <label for="formatSelect" class="field-label">Format</label>
+        <select id="formatSelect" class="select">
+          <option value="wav">WAV (lossless)</option>
+          <option value="mp3">MP3 (compressed)</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label for="qualitySelect" class="field-label">Quality</label>
+        <select id="qualitySelect" class="select"></select>
+      </div>
+      <div class="setup-footer">
+        <button class="btn btn-ghost btn-sm" id="testBtn">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><polygon points="3,2 11,7 3,12" fill="currentColor"/></svg>
+          5s mic test
+        </button>
+      </div>
+    </section>
+
+    <!-- Level controls with knobs -->
+    <section class="card" aria-label="Level controls">
+      <div class="card-label">Levels <span class="card-label-hint">— double-click knob or value to reset</span></div>
+      <div class="knobs-row">
+
+        <div class="knob-group">
+          <div class="knob-label">Input Gain</div>
+          <div class="knob-wrap">
+            <canvas class="knob-canvas" id="inputKnob" width="80" height="80" aria-label="Input gain knob" title="Drag to adjust · Double-click to reset"></canvas>
+          </div>
+          <div class="knob-input-wrap">
+            <input type="number" id="inputGainDb" class="knob-input" value="0" min="-20" max="20" step="0.5" aria-label="Input gain in dB" title="Double-click to reset to 0" />
+            <span class="knob-unit">dB</span>
+          </div>
+        </div>
+
+        <div class="meter-center">
+          <div class="meter-wrap" role="meter" aria-label="Input level">
+            <div class="meter-bar" id="meterBar"></div>
+            <div class="meter-peaks">
+              <span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span>
+            </div>
+          </div>
+          <div class="clip-warn" id="clipWarn" style="display:none;" role="alert">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2L13 12H1L7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.5" r="0.75" fill="currentColor"/></svg>
+            Clipping — reduce input gain
+          </div>
+        </div>
+
+        <div class="knob-group">
+          <div class="knob-label">Monitor</div>
+          <div class="knob-wrap">
+            <canvas class="knob-canvas" id="monitorKnob" width="80" height="80" aria-label="Monitor level knob" title="Drag to adjust · Double-click to reset"></canvas>
+          </div>
+          <div class="knob-input-wrap">
+            <input type="number" id="monitorDb" class="knob-input" value="-60" min="-60" max="0" step="0.5" aria-label="Monitor level in dB" title="Double-click to reset to 0" />
+            <span class="knob-unit">dB</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Scrolling waveform -->
+    <section class="waveform-section" aria-label="Live waveform monitor">
+      <div class="wave-header">
+        <span class="wave-title">Waveform Monitor</span>
+        <span class="wave-hint">Red zones = clipping</span>
+      </div>
+      <canvas id="waveCanvas" class="wave-canvas" height="140" aria-hidden="true"></canvas>
+    </section>
+
+    <!-- Recorder -->
+    <section class="card recorder-card" aria-label="Recording controls">
+      <div class="duration-display">
+        <span class="duration" id="duration" aria-live="polite">00:00:00</span>
+        <span class="duration-status" id="durStatus">Ready to record</span>
+      </div>
+      <div class="controls">
+        <button class="btn btn-record" id="recBtn" aria-label="Record or stop">
+          <span class="rec-dot"></span>
+          Record
+        </button>
+        <button class="btn btn-ghost" id="pauseBtn" disabled aria-label="Pause or resume">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="2" y="2" width="3.5" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="2" width="3.5" height="10" rx="1" fill="currentColor"/></svg>
+          Pause
+        </button>
+      </div>
+      <div class="markers">
+        <span class="markers-label">Mark</span>
+        <button class="btn btn-marker" id="m1" disabled>Intro</button>
+        <button class="btn btn-marker" id="m2" disabled>Break</button>
+        <button class="btn btn-marker" id="m3" disabled>Outro</button>
+        <button class="btn btn-marker" id="m4" disabled>Clip</button>
+      </div>
+      <div class="marker-log" id="markerLog" aria-live="polite"></div>
+      <div class="size-display" id="sizeDisplay"></div>
+    </section>
+
+    <!-- Downloads -->
+    <section class="card downloads" id="dlSection" aria-label="Download recordings">
+      <div class="card-label">Downloads ready</div>
+      <div class="dl-grid" id="dlGrid"></div>
+    </section>
+
+    <!-- Tips -->
+    <section class="tips-section">
+      <div class="tips-title">For best broadcast quality</div>
+      <ul class="tips-list">
+        <li>Use wired headphones to prevent echo feedback</li>
+        <li>Select your external USB or XLR interface mic, not built-in laptop mic</li>
+        <li>Keep the level meter peaking around –12 dB, never hitting 0 dB</li>
+        <li>If you see red on the waveform, reduce input gain immediately</li>
+        <li>Monitor volume only affects what you hear — it does not affect the recording</li>
+        <li>Do the 5s mic test before every session</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span>Vox5000 · Free broadcast audio recorder · Files never leave your device · <a href="/privacy.html" style="color:var(--text3);">Privacy Policy</a></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
