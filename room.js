@@ -64,10 +64,17 @@ function enterRoom(){
     roomId=randId(6);
     saveRoom(roomId,{name:'Interview Room',created:Date.now()});
     window.history.replaceState({},'',`?r=${roomId}`);
+    // Show a host-specific loading message
+    $('waitingScreen').style.display='flex';
+    $('waitingNameDisplay').textContent='Setting up your room…';
+    document.querySelector('#waitingScreen .screen-title').textContent='Creating your room';
+    document.querySelector('#waitingScreen .screen-sub').textContent='Just a moment while we set up your interview room.';
     initPeer(`HOST-${roomId}`);
   } else {
     $('waitingScreen').style.display='flex';
     $('waitingNameDisplay').textContent=`Joining as: ${name}`;
+    document.querySelector('#waitingScreen .screen-title').textContent='Waiting to be admitted';
+    document.querySelector('#waitingScreen .screen-sub').textContent='The host will let you in shortly. Keep this page open.';
     initPeer(`GUEST-${roomId}-${randId(4)}`);
   }
 }
@@ -335,6 +342,7 @@ function drawWave(canvasId,anal){
 
 // ── Show rooms ──
 function showHostRoom(){
+  $('waitingScreen').style.display='none';
   $('hostRoom').style.display='block';
   const rooms=getRooms(), rd=rooms[roomId]||{};
   $('roomCodeDisplay').textContent=roomId;
