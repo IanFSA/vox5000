@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Help — Vox5000</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .help-main { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
+    .help-section { margin-bottom: 32px; }
+    .help-section h2 { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 12px; letter-spacing: -0.02em; }
+    .help-section p { font-size: 15px; color: #aaa; line-height: 1.7; margin-bottom: 10px; }
+    .help-section ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .help-section ul li { font-size: 15px; color: #aaa; padding-left: 16px; position: relative; line-height: 1.6; }
+    .help-section ul li::before { content: '—'; position: absolute; left: 0; color: #555; }
+    .help-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+    .help-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+    .badge-host { background: var(--yellow-dim); color: var(--yellow); }
+    .badge-guest { background: rgba(68,255,136,0.1); color: var(--green); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo"><a href="index.html"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav style="display:flex;align-items:center;gap:4px;">
+        <a href="index.html" style="font-size:14px;font-weight:500;color:var(--text2);text-decoration:none;padding:6px 12px;border-radius:6px;">Home</a>
+        <a href="rooms.html" style="font-size:14px;font-weight:500;color:var(--text2);text-decoration:none;padding:6px 12px;border-radius:6px;">My Rooms</a>
+        <a href="help.html" style="font-size:14px;font-weight:500;color:var(--yellow);text-decoration:none;padding:6px 12px;border-radius:6px;">Help</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="help-main">
+    <h1 style="font-size:28px;font-weight:600;letter-spacing:-0.03em;color:var(--text);margin-bottom:8px;">Help & Guide</h1>
+    <p style="font-size:15px;color:#777;margin-bottom:32px;">Everything you need to get the best out of Vox5000.</p>
+
+    <div class="help-section">
+      <h2>Solo Recording</h2>
+      <p>The home page recorder is for recording yourself only — no guests, no internet connection needed beyond loading the page.</p>
+      <ul>
+        <li>Select your microphone from the dropdown</li>
+        <li>Choose your format — MP3 for smaller files, WAV for broadcast quality masters</li>
+        <li>Do a 5 second mic test before every session to check your levels</li>
+        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB (red)</li>
+        <li>Hit Record — the button also stops the recording when pressed again</li>
+        <li>Your file downloads automatically when you stop — nothing is sent to any server</li>
+      </ul>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>Interview Rooms</h2>
+      <p>Interview rooms let you record remote interviews with up to 3 guests. Everyone records locally on their own device for the best quality.</p>
+
+      <p><span class="help-badge badge-host">Host</span> Click "Start Interview Room" on the home page. Enter your name. Your room is created with a unique code.</p>
+      <ul>
+        <li>Copy the invite link and send it to your guests via WhatsApp, email or any messaging app</li>
+        <li>Guests appear in a waiting queue — admit or deny each one</li>
+        <li>You can see each guest's consent status — green tick means consented, eye icon means Observer</li>
+        <li>Hit Record — a 5 second countdown plays on all screens, then recording begins automatically</li>
+        <li>Use the Mark buttons during recording to drop Intro, Break, Outro and Clip timestamps</li>
+        <li>Hit Stop — guests automatically send their audio to you</li>
+        <li>Download each person's track separately, clearly labelled with their name</li>
+        <li>Download the consent log — keep it as legal proof</li>
+      </ul>
+
+      <p style="margin-top:16px;"><span class="help-badge badge-guest">Guest</span> Click the link the host sent you. No account or download needed.</p>
+      <ul>
+        <li>Put headphones on before joining — speakers cause echo that ruins the recording</li>
+        <li>Enter your name — it will be used to label your audio track</li>
+        <li>Tick the consent checkbox if you agree to be recorded. If you don't tick it, you join as an Observer — you can hear and chat but won't be recorded</li>
+        <li>Wait for the host to admit you</li>
+        <li>When the host starts recording you'll see a countdown, then a red recording indicator</li>
+        <li>When the host stops, your audio uploads automatically — keep the page open until it says Done</li>
+      </ul>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>Markers</h2>
+      <p>Use the Intro, Break, Outro and Clip buttons during recording to drop timestamp markers. When you stop, a text file downloads with all your markers listed with their timestamps — open it alongside your audio in Audacity to navigate quickly.</p>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>Input Gain & Monitor</h2>
+      <p>The Input Gain knob boosts or cuts your microphone signal before it hits the recorder. Drag it up to increase, down to decrease. Double-click to reset to 0 dB.</p>
+      <p>The Monitor knob controls how loud you hear yourself in your headphones. It does not affect the recording — only what you hear. Double-click to reset.</p>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>My Rooms</h2>
+      <p>Rooms persist in your browser until you delete them. Use the My Rooms page to see all your rooms, open them, copy invite links, rename them, or delete them.</p>
+      <p>If you return to a room you created, you'll go straight in without needing to re-enter your name.</p>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>Best practices for broadcast quality</h2>
+      <ul>
+        <li>Always use wired headphones — Bluetooth introduces latency and potential dropouts</li>
+        <li>Use an external USB or XLR interface microphone — not your laptop's built-in mic</li>
+        <li>Record in a quiet room — close doors and windows, turn off air conditioning</li>
+        <li>Do the 5 second mic test before every session</li>
+        <li>Keep levels peaking at around –12 dB — if the meter goes red you're clipping</li>
+        <li>Use Chrome on desktop for the most reliable experience</li>
+        <li>On mobile, use Chrome — Safari has limited Web Audio API support</li>
+      </ul>
+    </div>
+
+    <hr class="help-divider" />
+
+    <div class="help-section">
+      <h2>Privacy & data</h2>
+      <p>All audio recorded in solo mode stays on your device. Nothing is sent to any server. In interview rooms, guest audio is transferred directly from their browser to yours — peer to peer, not through any central server.</p>
+      <p>Read our full <a href="privacy.html" style="color:var(--yellow);">Privacy Policy</a> for details.</p>
+    </div>
+
+    <div style="margin-top:32px;">
+      <a href="index.html" class="btn btn-ghost" style="text-decoration:none;font-size:14px;">← Back to recorder</a>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>Vox5000 · <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a></span>
+  </footer>
+</body>
+</html>
