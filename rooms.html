@@ -4,67 +4,71 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Rooms — Vox5000</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="header">
+  <header class="header" role="banner">
     <div class="header-inner">
-      <div class="logo"><a href="index.html"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
-      <nav class="main-nav">
+      <div class="logo"><a href="index.html" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav class="main-nav" aria-label="Main navigation">
         <a href="index.html" class="nav-link">Home</a>
-        <a href="rooms.html" class="nav-link nav-active">My Rooms</a>
+        <a href="rooms.html" class="nav-link nav-active" aria-current="page">My Rooms</a>
         <a href="help.html" class="nav-link">Help</a>
       </nav>
+      <a href="room.html" class="nav-cta">Create room</a>
     </div>
   </header>
 
-  <main class="main">
+  <main class="main" id="main-content">
 
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:4px;">
       <div>
-        <h1 style="font-size:24px;font-weight:600;letter-spacing:-0.02em;color:var(--text);margin-bottom:6px;">My Rooms</h1>
-        <p style="font-size:15px;color:var(--text2);max-width:560px;line-height:1.6;">Create a room to record a remote interview. Invite guests with a link, admit them when they arrive, then download separate audio tracks when the session ends.</p>
+        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:8px;">Your interview rooms</h1>
+        <p style="font-size:15px;color:var(--text2);max-width:520px;line-height:1.65;">Create reusable rooms for interviews, shows and remote guests. Rooms are stored in this browser until you delete them.</p>
       </div>
-      <a href="room.html" class="btn btn-record" style="text-decoration:none;white-space:nowrap;">+ New Interview Room</a>
+      <a href="room.html" class="btn btn-record" style="text-decoration:none;align-self:flex-start;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Create new room
+      </a>
     </div>
 
-    <div class="notice-bar" style="margin-bottom:20px;">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
-      <span>Rooms are saved in <strong>this browser only</strong>. They will not appear on another device or browser. Clearing your browser data may delete them.</span>
+    <div class="notice-bar" role="note">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+      <span>Rooms are saved in <strong>this browser only</strong>. They won't appear on other devices or browsers. Clearing browser data may delete them.</span>
     </div>
 
-    <div id="roomsList"></div>
+    <div id="roomsList" aria-live="polite" aria-label="Your rooms"></div>
 
     <div id="noRooms" style="display:none;">
-      <div class="card" style="text-align:center;padding:40px 20px;">
-        <div style="font-size:32px;margin-bottom:16px;">🎙</div>
-        <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:8px;">No rooms yet</div>
-        <p style="font-size:14px;color:var(--text2);margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.6;">Create your first interview room to start recording remote guests with separate audio tracks.</p>
-        <a href="room.html" class="btn btn-record" style="text-decoration:none;display:inline-flex;">Create Interview Room</a>
+      <div class="card" style="text-align:center;padding:52px 24px;">
+        <div style="font-size:40px;margin-bottom:20px;" aria-hidden="true">🎙</div>
+        <h2 style="font-size:19px;font-weight:700;color:var(--text);margin-bottom:10px;">No rooms yet</h2>
+        <p style="font-size:14px;color:var(--text2);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.65;">Create a room, copy the invite link and send it to your guest. Each person records locally and you download separate tracks when done.</p>
+        <a href="room.html" class="btn btn-record" style="text-decoration:none;display:inline-flex;">Create your first room</a>
       </div>
     </div>
 
   </main>
 
-  <footer class="footer">
+  <footer class="footer" role="contentinfo">
     <div class="footer-inner">
-      <span>Vox5000 · Free broadcast audio recorder</span>
-      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, guest audio transfers directly from guest to host — Vox5000 does not store audio on any server.</span>
-      <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a>
+      <span>© 2026 Vox5000</span>
+      <a href="privacy.html" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
     </div>
   </footer>
 
   <script>
     function getRooms(){try{return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}');}catch{return{};}}
     function saveRooms(r){localStorage.setItem('vox5000_rooms',JSON.stringify(r));}
-    function $(id){return document.getElementById(id);}
 
     function render(){
-      const rooms=getRooms(),list=$('roomsList'),none=$('noRooms');
+      const rooms=getRooms();
+      const list=document.getElementById('roomsList');
+      const none=document.getElementById('noRooms');
       const keys=Object.keys(rooms);
       if(keys.length===0){list.innerHTML='';none.style.display='block';return;}
       none.style.display='none';
@@ -72,16 +76,18 @@
         const r=rooms[id];
         const date=r.created?new Date(r.created).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'Unknown';
         return `<div class="card" style="margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
             <div>
-              <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;">${r.name||'Interview Room'}</div>
-              <div style="font-family:var(--mono);font-size:12px;color:var(--yellow);margin-bottom:4px;">Room code: ${id}</div>
-              <div style="font-size:12px;color:var(--text3);">Created ${date}</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:5px;">${r.name||'Interview Room'}</div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-family:var(--mono);font-size:11px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-border);padding:2px 9px;border-radius:4px;">${id}</span>
+                <span style="font-size:12px;color:var(--text3);">Created ${date}</span>
+              </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <a href="room.html?r=${id}" class="btn btn-ghost" style="text-decoration:none;font-size:13px;padding:7px 14px;">Open Room</a>
-              <button onclick="copyLink('${id}')" class="btn btn-ghost" style="font-size:13px;padding:7px 14px;">📋 Copy Link</button>
-              <button onclick="deleteRoom('${id}')" class="btn btn-ghost" style="font-size:13px;padding:7px 14px;color:#FF4444;border-color:rgba(255,68,68,0.3);">Delete</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <a href="room.html?r=${id}" class="btn btn-record btn-sm" style="text-decoration:none;">Open room</a>
+              <button onclick="copyLink('${id}')" class="btn btn-ghost btn-sm">📋 Copy link</button>
+              <button onclick="deleteRoom('${id}')" class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(255,59,59,0.25);">Delete</button>
             </div>
           </div>
         </div>`;
@@ -95,9 +101,10 @@
     };
     window.copyLink=function(id){
       const url=`${location.origin}/room.html?r=${id}`;
-      navigator.clipboard.writeText(url).then(()=>alert('Invite link copied to clipboard!'));
+      navigator.clipboard.writeText(url).then(()=>{
+        alert('Invite link copied to clipboard!');
+      });
     };
-
     render();
   </script>
 </body>

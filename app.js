@@ -34,6 +34,19 @@ const formatSelect  = $('formatSelect');
 const qualitySelect = $('qualitySelect');
 const m1=$('m1'), m2=$('m2'), m3=$('m3'), m4=$('m4');
 
+// Solo mode toggle — init mics when user opens recorder
+let micsInitialised = false;
+const soloRecorderEl = document.getElementById('soloRecorder');
+if (soloRecorderEl) {
+  const observer = new MutationObserver(() => {
+    if (soloRecorderEl.style.display !== 'none' && !micsInitialised) {
+      micsInitialised = true;
+      initMics();
+    }
+  });
+  observer.observe(soloRecorderEl, { attributes: true, attributeFilter: ['style'] });
+}
+
 let audioCtx, analyser, stream;
 let gainNode, monitorGainNode, monitorDest;
 let mediaRecorder, chunks = [];

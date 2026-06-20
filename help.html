@@ -4,228 +4,212 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Help — Vox5000</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .help-main{max-width:720px;margin:0 auto;padding:40px 20px 80px;}
-    .help-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border);}
-    .help-nav a{font-size:13px;color:var(--text2);text-decoration:none;padding:5px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;transition:all 0.15s;}
-    .help-nav a:hover{color:var(--yellow);border-color:rgba(232,255,71,0.3);}
-    .help-section{margin-bottom:36px;scroll-margin-top:80px;}
-    .help-section h2{font-size:19px;font-weight:600;color:var(--text);margin-bottom:12px;letter-spacing:-0.02em;}
-    .help-section p{font-size:15px;color:#bbb;line-height:1.7;margin-bottom:10px;}
-    .help-section ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
-    .help-section ul li{font-size:15px;color:#bbb;padding-left:18px;position:relative;line-height:1.6;}
-    .help-section ul li::before{content:'—';position:absolute;left:0;color:#555;}
+    .help-main{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+    .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px;}
+    @media(max-width:600px){.help-grid{grid-template-columns:1fr;}}
+    .help-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:22px;}
+    .help-card h2{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+    .help-card p{font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:8px;}
+    .help-card ul{list-style:none;display:flex;flex-direction:column;gap:7px;}
+    .help-card ul li{font-size:13px;color:var(--text2);padding-left:16px;position:relative;line-height:1.55;}
+    .help-card ul li::before{content:'—';position:absolute;left:0;color:var(--text3);}
+    .help-card-full{grid-column:1/-1;}
+    .checklist-card{background:linear-gradient(135deg,rgba(223,255,0,0.06) 0%,var(--bg2) 100%);border:1px solid var(--yellow-border);}
+    .checklist-item{display:flex;align-items:flex-start;gap:12px;font-size:14px;color:var(--text2);padding:10px 0;border-bottom:1px solid var(--border);}
+    .checklist-item:last-child{border-bottom:none;padding-bottom:0;}
+    .checklist-num{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+    .trouble-item{border-bottom:1px solid var(--border);padding:14px 0;}
+    .trouble-item:first-child{padding-top:0;}
+    .trouble-item:last-child{border-bottom:none;padding-bottom:0;}
+    .trouble-q{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;}
+    .trouble-a{font-size:13px;color:var(--text2);line-height:1.65;}
+    .help-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:28px;}
+    .help-nav a{font-size:12px;color:var(--text2);text-decoration:none;padding:5px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;transition:all 0.15s;}
+    .help-nav a:hover{color:var(--yellow);border-color:var(--yellow-border);}
+    h1{font-size:26px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:6px;}
+    .browser-alert{background:rgba(223,255,0,0.06);border:1px solid var(--yellow-border);border-radius:var(--radius);padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--text2);}
+    .browser-alert strong{color:var(--yellow);}
     hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
-    .help-badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:4px;margin-right:8px;vertical-align:middle;}
-    .badge-host{background:var(--yellow-dim);color:var(--yellow);}
-    .badge-guest{background:rgba(68,255,136,0.1);color:var(--green);}
-    .trouble-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;}
-    .trouble-q{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;cursor:pointer;}
-    .trouble-a{font-size:14px;color:#bbb;line-height:1.7;}
-    .browser-alert{background:rgba(232,255,71,0.07);border:1px solid rgba(232,255,71,0.2);border-radius:var(--radius);padding:14px 18px;margin-bottom:24px;font-size:14px;color:rgba(232,255,71,0.9);}
   </style>
 </head>
 <body>
-  <header class="header">
+  <header class="header" role="banner">
     <div class="header-inner">
-      <div class="logo"><a href="index.html"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
-      <nav class="main-nav">
+      <div class="logo"><a href="index.html" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav class="main-nav" aria-label="Main navigation">
         <a href="index.html" class="nav-link">Home</a>
         <a href="rooms.html" class="nav-link">My Rooms</a>
-        <a href="help.html" class="nav-link nav-active">Help</a>
+        <a href="help.html" class="nav-link nav-active" aria-current="page">Help</a>
       </nav>
+      <a href="room.html" class="nav-cta">Create room</a>
     </div>
   </header>
 
-  <main class="help-main">
-    <h1 style="font-size:26px;font-weight:600;letter-spacing:-0.02em;color:var(--text);margin-bottom:8px;">Help & Guide</h1>
-    <p style="font-size:15px;color:#777;margin-bottom:24px;">Everything you need to get the best out of Vox5000.</p>
+  <main class="help-main" id="main-content">
+
+    <h1>Help & Guide</h1>
+    <p style="font-size:15px;color:var(--text2);margin-bottom:24px;">Everything you need to get the best out of Vox5000.</p>
 
     <div class="browser-alert">
-      ⚠ <strong>Browser recommendation:</strong> Use Google Chrome on a desktop or laptop for the most reliable experience. Mobile Safari on iPhone and iPad has limited Web Audio API support and may not record or upload reliably.
+      <strong>⚠ Browser recommendation:</strong> Use Google Chrome on a desktop or laptop for the most reliable experience. Mobile Safari on iPhone and iPad has limited Web Audio API support and may not record or upload reliably.
     </div>
 
-    <!-- Quick jump links -->
-    <nav class="help-nav" aria-label="Help sections">
+    <!-- Jump links -->
+    <nav class="help-nav" aria-label="Jump to section">
       <a href="#quickstart">Quick start</a>
       <a href="#solo">Solo recording</a>
-      <a href="#rooms">Interview rooms</a>
-      <a href="#guest">Guest guide</a>
-      <a href="#markers">Markers</a>
-      <a href="#levels">Gain & monitor</a>
+      <a href="#hosting">Hosting an interview</a>
+      <a href="#guest">Joining as a guest</a>
       <a href="#consent">Consent & privacy</a>
-      <a href="#bestpractice">Best settings</a>
-      <a href="#troubleshooting">Fix problems</a>
+      <a href="#quality">Audio quality</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#formats">File formats</a>
     </nav>
 
-    <div class="help-section" id="quickstart">
-      <h2>Quick start</h2>
-      <p><strong>Recording yourself:</strong> Click "Record Myself" on the home page → complete the preflight checklist → select your mic → do a 5s test → hit Record.</p>
-      <p><strong>Recording an interview:</strong> Click "Start Interview Room" → enter your name → copy the invite link → send it to your guest → admit them when they appear → hit Record → hit Stop when done → download all tracks.</p>
+    <!-- Before every recording checklist -->
+    <div class="help-card checklist-card" style="margin-bottom:28px;" id="quickstart">
+      <h2>✅ Before every recording</h2>
+      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">1</div><div>Use <strong>wired headphones</strong> or earphones — Bluetooth adds latency and dropouts</div></div>
+      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">2</div><div>Select your <strong>external mic</strong> from the dropdown — not the built-in laptop mic</div></div>
+      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">3</div><div>Do a <strong>5 second mic test</strong> and listen back before starting</div></div>
+      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">4</div><div>Keep levels <strong>peaking around –12 dB</strong> — never hitting 0 dB red</div></div>
+      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">5</div><div>Use <strong>Chrome on desktop</strong> for the most reliable experience</div></div>
     </div>
 
-    <hr />
+    <div class="help-grid">
 
-    <div class="help-section" id="solo">
-      <h2>Solo recording</h2>
-      <p>The solo recorder is for recording yourself only — no guests, no internet connection required beyond loading the page.</p>
-      <ul>
-        <li>Select your microphone from the dropdown</li>
-        <li>Choose MP3 for smaller files or WAV for a broadcast quality master</li>
-        <li>Do a 5 second mic test before every session to check your levels</li>
-        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB</li>
-        <li>Hit Record — the same button stops the recording when pressed again</li>
-        <li>Your file downloads automatically when you stop — nothing is sent to any server</li>
-      </ul>
+      <div class="help-card" id="solo">
+        <h2>🎙 Solo recording</h2>
+        <ul>
+          <li>Click "Start solo recording" on the home page</li>
+          <li>Select your microphone and format (MP3 or WAV)</li>
+          <li>Do a 5s mic test to check your levels</li>
+          <li>Hit Record — the same button stops recording</li>
+          <li>Your file downloads automatically when you stop</li>
+          <li>Nothing is sent to any server — files stay on your device</li>
+        </ul>
+      </div>
+
+      <div class="help-card" id="hosting">
+        <h2>🎧 Hosting an interview</h2>
+        <ul>
+          <li>Click "Create interview room" and name the room</li>
+          <li>Copy the invite link — send via WhatsApp or email</li>
+          <li>Admit guests from the waiting queue</li>
+          <li>See consent status for each guest: consented or observer</li>
+          <li>Hit Record — 5 second countdown on all screens</li>
+          <li>Stop recording — guest tracks upload to you automatically</li>
+          <li>Download separate WAV files labelled by name</li>
+          <li>Download the consent log for your records</li>
+        </ul>
+      </div>
+
+      <div class="help-card" id="guest">
+        <h2>🙋 Joining as a guest</h2>
+        <ul>
+          <li>Click the link the host sent you — no app install needed</li>
+          <li>Put wired headphones on before entering</li>
+          <li>Enter your name — it will label your audio track</li>
+          <li>Tick the consent checkbox to be recorded, or join as an Observer (mic off, listen only)</li>
+          <li>Wait for the host to admit you</li>
+          <li>You'll see a countdown when recording starts</li>
+          <li><strong>Keep the page open until you see the green Done message</strong></li>
+        </ul>
+      </div>
+
+      <div class="help-card" id="consent">
+        <h2>🔒 Consent & privacy</h2>
+        <ul>
+          <li><strong>Solo mode:</strong> audio stays entirely on your device</li>
+          <li><strong>Interview rooms:</strong> audio transfers peer to peer from guest to host — Vox5000 never sees it</li>
+          <li>Consent logs are stored locally by the host — not on Vox5000 servers</li>
+          <li>Log includes: name, consent decision, timestamp, IP address and browser details</li>
+          <li>Observer mode: mic off, can hear and chat, not recorded</li>
+          <li>Read the full <a href="privacy.html" style="color:var(--yellow);">Privacy Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="help-card" id="quality">
+        <h2>🎚 Audio quality checklist</h2>
+        <ul>
+          <li>External USB or XLR interface mic — not laptop built-in</li>
+          <li>Wired headphones — not Bluetooth</li>
+          <li>Quiet room — close doors, turn off air conditioning</li>
+          <li>Levels peaking at –12 dB — not 0 dB</li>
+          <li>WAV 48kHz 24-bit for broadcast masters</li>
+          <li>MP3 320kbps for delivery and sharing</li>
+          <li>Chrome on desktop for interviews</li>
+        </ul>
+      </div>
+
+      <div class="help-card" id="formats">
+        <h2>💾 Downloads & file formats</h2>
+        <ul>
+          <li><strong>MP3</strong> — compressed, smaller files, great for sharing and delivery</li>
+          <li><strong>WAV</strong> — lossless, broadcast master quality, larger files</li>
+          <li>320 kbps MP3 is the standard for radio delivery</li>
+          <li>48kHz / 24-bit WAV is the broadcast master standard</li>
+          <li>Guest tracks are named with the guest's name and a timestamp</li>
+          <li>Marker log downloads as a .txt file alongside audio</li>
+          <li>Files go to your Downloads folder — Ctrl+J / Cmd+J to find them</li>
+        </ul>
+      </div>
+
     </div>
 
-    <hr />
-
-    <div class="help-section" id="rooms">
-      <h2>Interview rooms — host guide</h2>
-      <p><span class="help-badge badge-host">Host</span>You create and control the room.</p>
-      <ul>
-        <li>Click "Start Interview Room" from the home page</li>
-        <li>Enter your name — it labels your audio track</li>
-        <li>Copy the invite link and send it to guests via WhatsApp, email or any messaging app</li>
-        <li>Guests appear in a waiting queue on your screen — admit or deny each one</li>
-        <li>You can see each guest's consent status: 🟢 Consented, 👁 Observer, or ⚠ Not consented</li>
-        <li>Hit Record — a 5 second countdown plays on all screens, then recording begins on all devices simultaneously</li>
-        <li>Use the Mark buttons to drop Intro, Break, Outro and Clip timestamps during recording</li>
-        <li>Hit Stop — a 5 second warning appears, then guests automatically send their audio to you</li>
-        <li>Keep the page open until all tracks show a green tick</li>
-        <li>Download each person's WAV track, clearly labelled with their name</li>
-        <li>Download the consent log — keep it for your records</li>
-      </ul>
-      <p style="margin-top:12px;"><strong>Muting and removing guests:</strong> Each guest row has a Mute button and a Kick button. Muted guests can still hear but their mic is silenced. Kicked guests are removed and shown a thank you message.</p>
-      <p><strong>Room persistence:</strong> Rooms are saved in your browser. If you navigate away and return to the same room URL, you go straight back in without re-entering your name.</p>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="guest">
-      <h2>Guest guide</h2>
-      <p><span class="help-badge badge-guest">Guest</span>Click the link your host sent you. No account or download needed.</p>
-      <ul>
-        <li><strong>Put headphones on first</strong> — speakers cause echo that ruins the recording for everyone</li>
-        <li>Enter your name — it will label your audio track in the final download</li>
-        <li>Tick the consent checkbox if you agree to be recorded. If you don't tick it, you join as an Observer — you can hear and chat but your mic will be off and you won't be recorded</li>
-        <li>Wait for the host to admit you</li>
-        <li>When the host starts recording you'll see a 5 second countdown, then a red recording indicator appears</li>
-        <li>Speak normally — your audio is recorded locally on your device</li>
-        <li>When the host stops recording, your track uploads automatically to the host</li>
-        <li><strong>Keep the page open until you see the green Done message</strong> — closing it early will lose your track</li>
-        <li>After Done appears you can close the page</li>
-      </ul>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="markers">
-      <h2>Markers</h2>
-      <p>Use the Intro, Break, Outro and Clip buttons during recording to drop timestamp markers in real time. When you stop, a text file downloads alongside your audio with all markers listed. Open it in Audacity or your DAW to navigate quickly to key moments.</p>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="levels">
-      <h2>Input Gain & Monitor</h2>
-      <p><strong>Input Gain</strong> — boosts or cuts your microphone signal before it hits the recorder. Drag the knob up to increase, down to decrease. Double-click the knob or the dB number to reset to 0 dB.</p>
-      <p><strong>Monitor</strong> — controls how loud you hear yourself in your headphones. It does not affect the recording at all — only what you hear. Double-click to reset. Start at –60 dB (silent) and raise until comfortable.</p>
-      <p><strong>The level meter</strong> — aim for peaks between –24 and –6 dB (the green zone). Above –6 dB the signal clips and distorts. Below –24 dB the recording will be too quiet.</p>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="consent">
-      <h2>Consent & privacy</h2>
-      <p><strong>Solo mode:</strong> Your audio is recorded entirely on your device. Nothing is sent to any server. Vox5000 never sees your audio.</p>
-      <p><strong>Interview rooms:</strong> Each participant records locally on their own device. When the session ends, guest tracks are transferred directly from each guest's browser to the host's browser — peer to peer. Vox5000 does not receive, store or process any audio.</p>
-      <p><strong>Consent log:</strong> When a guest enters a room, their name, consent decision, timestamp, IP address and browser details are recorded and stored locally in the host's session. This data never goes to Vox5000's servers. The host can download the consent log as a text file to keep for their own records. The log documents who consented to recording and who joined as an Observer.</p>
-      <p><strong>Observer mode:</strong> If a guest does not tick the consent checkbox, they join as an Observer. Their microphone is switched off and they cannot be recorded. They can still hear everyone and use the text chat.</p>
-      <p>Read the full <a href="privacy.html" style="color:var(--yellow);">Privacy Policy</a> for complete details.</p>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="bestpractice">
-      <h2>Best settings for broadcast quality</h2>
-      <ul>
-        <li><strong>Browser:</strong> Google Chrome on desktop or laptop — most reliable</li>
-        <li><strong>Headphones:</strong> Wired — Bluetooth adds latency and potential dropouts</li>
-        <li><strong>Microphone:</strong> External USB or XLR interface mic — not your laptop's built-in mic</li>
-        <li><strong>Environment:</strong> Quiet room, doors closed, air conditioning off</li>
-        <li><strong>Level:</strong> Peaks at –12 dB on the meter — never hitting 0 dB red</li>
-        <li><strong>Format for broadcast:</strong> WAV 48kHz 24-bit for masters, MP3 320kbps for delivery</li>
-        <li><strong>Mobile:</strong> Chrome on Android is acceptable. iPhone Safari is not recommended for recording</li>
-        <li><strong>Long sessions:</strong> Keep your screen on and don't switch apps — especially on mobile</li>
-      </ul>
-    </div>
-
-    <hr />
-
-    <div class="help-section" id="troubleshooting">
-      <h2>Fix common problems</h2>
-
+    <!-- Troubleshooting — full width -->
+    <div class="help-card help-card-full" id="troubleshooting">
+      <h2>🔧 Troubleshooting</h2>
       <div class="trouble-item">
         <div class="trouble-q">🚫 My microphone is not showing up</div>
-        <div class="trouble-a">Make sure your mic is plugged in before loading the page. If it's a USB mic or interface, check it appears in your computer's sound settings. Refresh the page after plugging it in. If you're on Windows, check that Chrome has mic permission in Windows Settings → Privacy → Microphone.</div>
+        <div class="trouble-a">Make sure your mic is plugged in before loading the page. Check it appears in your computer's sound settings. Refresh the page after plugging it in. On Windows, check Chrome has mic permission in Windows Settings → Privacy → Microphone.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">🔒 I clicked Deny on the microphone permission</div>
-        <div class="trouble-a">Click the padlock or microphone icon in Chrome's address bar → Site settings → Microphone → Change to Allow. Then refresh the page.</div>
+        <div class="trouble-a">Click the padlock or microphone icon in Chrome's address bar → Site settings → Microphone → Allow. Then refresh the page.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">🔊 I can hear myself echoing</div>
-        <div class="trouble-a">You or your guest is not using headphones. Speakers pick up the audio from the call and feed it back into the mic. Everyone in an interview room must use headphones or earphones.</div>
+        <div class="trouble-a">You or your guest is not using headphones. Speakers pick up the call audio and feed it back into the mic. Everyone in an interview room must use headphones or earphones.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">📊 The recording is too quiet or distorted</div>
-        <div class="trouble-a">Too quiet — increase the Input Gain knob until peaks hit around –12 dB. Distorted (red on waveform) — decrease Input Gain immediately. Aim for peaks between –24 and –6 dB.</div>
+        <div class="trouble-a">Too quiet — increase Input Gain until peaks hit around –12 dB. Distorted (red on waveform) — decrease Input Gain immediately. Target –24 to –6 dB.</div>
       </div>
-
       <div class="trouble-item">
-        <div class="trouble-q">👥 The guest is not appearing in my waiting queue</div>
-        <div class="trouble-a">Make sure you sent them the correct link — it should contain your room code (e.g. room.html?r=XXXXXX). Both you and the guest need to be on the same page at the same time. Ask them to refresh and try again. Both should use Chrome on desktop if possible.</div>
+        <div class="trouble-q">👥 Guests are not appearing in my waiting queue</div>
+        <div class="trouble-a">Make sure you sent the correct link containing your room code. Both you and the guest need to have the page open at the same time. Ask them to refresh and try again. Both should use Chrome on desktop if possible.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">📤 The guest upload is stuck or not progressing</div>
-        <div class="trouble-a">Both the host and guest must keep their page open and not lock their screen. If upload stalls, the guest should download their own track using the browser's download option before closing. Ask them to send it to you via WeTransfer or Google Drive as a fallback.</div>
+        <div class="trouble-a">Both host and guest must keep their page open and not lock their screen. If upload stalls, ask the guest to download their recording and send it via WeTransfer or Google Drive as a fallback.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">📱 I'm on an iPhone and recording isn't working</div>
-        <div class="trouble-a">Safari on iOS has limited Web Audio API support. Use Chrome on iOS instead. For the most reliable experience, join from a desktop or laptop computer. Do not lock your screen or switch apps during recording on mobile.</div>
+        <div class="trouble-a">Safari on iOS has limited Web Audio API support. Use Chrome on iOS instead. For the most reliable experience, join from a desktop or laptop. Do not lock your screen or switch apps during recording on mobile.</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">💾 I can't find my downloaded file</div>
-        <div class="trouble-a">Check your Downloads folder. On Chrome, press Ctrl+J (Windows) or Cmd+Shift+J (Mac) to see recent downloads. Files are named with your name and a timestamp, e.g. Ian_HOST_2026-06-19.wav</div>
+        <div class="trouble-a">Check your Downloads folder. In Chrome press Ctrl+J (Windows) or Cmd+Shift+J (Mac) to see recent downloads. Files are named with your name and a timestamp, e.g. Ian_HOST_2026-06-20.wav</div>
       </div>
-
       <div class="trouble-item">
         <div class="trouble-q">🏠 My rooms have disappeared</div>
-        <div class="trouble-a">Rooms are stored in your browser's local storage. They can be lost if you clear your browser data, use private/incognito mode, or switch to a different browser or device. Always download your files before clearing browser data.</div>
+        <div class="trouble-a">Rooms are stored in your browser's local storage. They can be lost if you clear browser data, use private/incognito mode, or switch to a different browser or device.</div>
       </div>
-
     </div>
 
   </main>
 
-  <footer class="footer">
+  <footer class="footer" role="contentinfo">
     <div class="footer-inner">
-      <span>Vox5000 · Free broadcast audio recorder</span>
-      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, guest audio transfers directly from guest to host — Vox5000 does not store audio on any server.</span>
-      <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a>
+      <span>© 2026 Vox5000</span>
+      <a href="privacy.html" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
     </div>
   </footer>
 </body>
