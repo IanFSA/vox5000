@@ -9,34 +9,6 @@
   }
 })();
 
-// ── Solo mode toggle ──
-const soloModeBtn = document.getElementById('soloModeBtn');
-const soloRecorder = document.getElementById('soloRecorder');
-const closeSoloBtn = document.getElementById('closeSoloBtn');
-const howItWorks = document.getElementById('howItWorks');
-const dismissPreflight = document.getElementById('dismissPreflight');
-const preflightCard = document.getElementById('preflightCard');
-
-if (soloModeBtn) {
-  soloModeBtn.addEventListener('click', () => {
-    soloRecorder.style.display = 'block';
-    if (howItWorks) howItWorks.style.display = 'none';
-    soloRecorder.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-}
-if (closeSoloBtn) {
-  closeSoloBtn.addEventListener('click', () => {
-    soloRecorder.style.display = 'none';
-    if (howItWorks) howItWorks.style.display = 'block';
-  });
-}
-if (dismissPreflight) {
-  dismissPreflight.addEventListener('click', () => {
-    preflightCard.style.display = 'none';
-    initMics();
-  });
-}
-
 const $ = id => document.getElementById(id);
 
 const micSelect     = $('micSelect');
@@ -635,4 +607,4 @@ function addDownload(name, meta, url, filename) {
   `);
 }
 
-// initMics is called when user dismisses preflight checklist
+initMics();
