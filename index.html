@@ -44,6 +44,14 @@
         </button>
         <a href="room.html" class="btn btn-ghost">Create interview room</a>
       </div>
+      <!-- Guest join box -->
+      <div class="guest-join-box">
+        <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Been invited to a room?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="joinCodeInput" placeholder="Paste your invite link or room code here" class="join-input" aria-label="Room invite link or code" />
+          <button class="btn btn-ghost" id="joinRoomBtn" style="white-space:nowrap;flex-shrink:0;">Join Room →</button>
+        </div>
+      </div>
       <div class="hero-trust" role="list" aria-label="Product features">
         <span role="listitem">No install</span>
         <span role="listitem">No account</span>
@@ -262,6 +270,25 @@
       advancedToggle.classList.toggle('open', open);
       advancedToggle.setAttribute('aria-expanded', String(open));
       advancedSection.setAttribute('aria-hidden', String(!open));
+    });
+
+    // Guest room join
+    function joinRoom() {
+      const val = document.getElementById('joinCodeInput').value.trim();
+      if (!val) { document.getElementById('joinCodeInput').focus(); return; }
+      let code = val;
+      try {
+        const url = new URL(val);
+        const r = url.searchParams.get('r');
+        if (r) code = r;
+      } catch(e) {
+        code = val.replace(/[^A-Za-z0-9]/g,'').toUpperCase().substr(0,8);
+      }
+      if (code) window.location.href = `room.html?r=${code}`;
+    }
+    document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
+    document.getElementById('joinCodeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinRoom();
     });
   </script>
 </body>

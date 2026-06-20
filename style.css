@@ -742,3 +742,28 @@ body {
 }
 .share-btn:hover { opacity: 0.88; }
 .share-btn:active { transform: scale(0.97); }
+
+/* ── Guest join box ── */
+.guest-join-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.join-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--bg3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.join-input:focus { border-color: var(--yellow); }
+.join-input::placeholder { color: var(--text3); }
