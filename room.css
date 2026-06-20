@@ -109,3 +109,11 @@
 .nav-link { font-size: 14px; font-weight: 500; color: var(--text2); text-decoration: none; padding: 6px 12px; border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; }
 .nav-link:hover { color: var(--text); background: var(--bg3); }
 @media (max-width: 480px) { .nav-link { font-size: 13px; padding: 5px 8px; } }
+
+/* ── Participant volume controls ── */
+.participant-vol { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: 0 8px; border-left: 1px solid var(--border); margin-left: 4px; }
+.vol-slider { width: 80px; height: 4px; -webkit-appearance: none; appearance: none; background: var(--bg3); border-radius: 2px; outline: none; cursor: pointer; border: 1px solid var(--border); }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--yellow); cursor: pointer; border: none; }
+.vol-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--yellow); cursor: pointer; border: none; }
+.vol-label { font-family: var(--mono); font-size: 11px; color: var(--yellow); min-width: 34px; text-align: right; }
+.clip-warn-row { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--red); margin-top: 4px; animation: fadeIn 0.2s ease; }

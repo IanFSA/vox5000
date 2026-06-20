@@ -74,6 +74,9 @@ $('noHeadphones').addEventListener('click',()=>{$('headphoneScreen').style.displ
 $('nowHasHeadphones').addEventListener('click',()=>{$('feedbackWarnScreen').style.display='none';$('nameScreen').style.display='flex';});
 $('continueAnyway').addEventListener('click',()=>{$('feedbackWarnScreen').style.display='none';$('nameScreen').style.display='flex';});
 
+// Show room name field for host only
+if(isHost) $('roomNameSection').style.display='block';
+
 // Show consent only for guests
 if(!isHost) $('consentSection').style.display='block';
 if(!isHost) $('consentCheck').addEventListener('change',()=>{myConsented=$('consentCheck').checked;myIsObserver=!myConsented;});
@@ -92,7 +95,10 @@ async function enterRoom(){
   if(isHost){
     myConsented=true;myIsObserver=false;
     roomId=randId(6);
-    saveRoom(roomId,{name:'Interview Room',created:Date.now()});
+    // Use custom room name if provided, otherwise default
+    const customName=$('roomNameInput').value.trim();
+    const roomName=customName||'Interview Room';
+    saveRoom(roomId,{name:roomName,created:Date.now()});
     saveHostSession({roomId,name:myName});
     window.history.replaceState({},'',`?r=${roomId}`);
     const info=await getVisitorInfo();
@@ -165,10 +171,17 @@ function handleHostMessage(data,conn){
     $('waitingScreen').style.display='none';
     showGuestRoom();
     getMic().then(s=>{
-      if(myIsObserver) s.getAudioTracks().forEach(t=>t.enabled=false);
-      setupLocalAnalyser(s,'guestWaveCanvas');
-      const call=peer.call(`HOST-${roomId}`,myIsObserver?new MediaStream():s);
-      call.on('stream',remote=>addRemoteAudio('host',remote));
+      if(myIsObserver){
+        s.getAudioTracks().forEach(t=>t.enabled=false);
+        setupLocalAnalyser(s,'guestWaveCanvas');
+        const call=peer.call(`HOST-${roomId}`,new MediaStream());
+        call.on('stream',remote=>addRemoteAudio('host',remote));
+      } else {
+        // Use full audio graph with gain and monitor for consented guests
+        setupGuestAudioGraph(s);
+        const call=peer.call(`HOST-${roomId}`,s);
+        call.on('stream',remote=>addRemoteAudio('host',remote));
+      }
     });
     guestSystemMsg(`You're in the room${myIsObserver?' as an Observer':''}.`);
   }
@@ -336,6 +349,9 @@ function showThankyou(msg){
 }
 
 // ── Audio ──
+// gainNodes: peerId → GainNode (controls how loud host hears each guest)
+const remoteGainNodes={};
+
 function addRemoteAudio(peerId,remoteStream){
   let a=$(`audio-${peerId}`);
   if(!a){a=document.createElement('audio');a.id=`audio-${peerId}`;a.autoplay=true;a.setAttribute('playsinline','');$('audioElements').appendChild(a);}
@@ -352,11 +368,52 @@ function setupLocalAnalyser(s,canvasId){
 
 function setupRemoteAnalyser(peerId,remote){
   if(!audioCtx)return;
-  const a=audioCtx.createAnalyser();a.fftSize=512;
-  try{audioCtx.createMediaStreamSource(remote).connect(a);}catch(e){}
-  if(peers[peerId])peers[peerId].analyser=a;
-  drawMeter(peerId,a);
+  // Create gain node so host can control volume of each guest
+  const gainNode=audioCtx.createGain();
+  gainNode.gain.value=1.0;
+  remoteGainNodes[peerId]=gainNode;
+
+  const anal=audioCtx.createAnalyser();anal.fftSize=512;
+  try{
+    const src=audioCtx.createMediaStreamSource(remote);
+    src.connect(gainNode);
+    gainNode.connect(anal);
+    gainNode.connect(audioCtx.destination);
+  }catch(e){}
+  if(peers[peerId])peers[peerId].analyser=anal;
+  drawMeter(peerId,anal);
+  monitorPeerClipping(peerId,anal);
 }
+
+// Monitor clipping for each guest and warn host
+function monitorPeerClipping(peerId,anal){
+  const buf=new Uint8Array(anal.frequencyBinCount);
+  let clipTimeout;
+  function tick(){
+    if(!anal) return;
+    try{anal.getByteTimeDomainData(buf);}catch{return;}
+    let clipping=false;
+    for(let i=0;i<buf.length;i++){if(buf[i]>242||buf[i]<13){clipping=true;break;}}
+    const warn=$(`clip-warn-${peerId}`);
+    if(warn){
+      if(clipping){
+        warn.style.display='flex';
+        clearTimeout(clipTimeout);
+        clipTimeout=setTimeout(()=>{warn.style.display='none';},2000);
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// Host sets volume for a guest (how loud they hear that person)
+window.setGuestVolume=function(peerId,val){
+  const gain=remoteGainNodes[peerId];
+  if(gain) gain.gain.value=parseFloat(val);
+  const label=$(`vol-label-${peerId}`);
+  if(label) label.textContent=Math.round(val*100)+'%';
+};
 
 function drawMeter(id,anal){
   const buf=new Uint8Array(anal.frequencyBinCount);
@@ -422,6 +479,9 @@ function showGuestRoom(){
   } else {
     $('guestConsentBadge').textContent='🟢 Consented';
     $('guestConsentBadge').className='badge-consented';
+    // Show level controls for consented guests
+    $('guestLevelCard').style.display='block';
+    initGuestKnobs();
   }
   setupGuestControls();
 }
@@ -447,18 +507,38 @@ function makeParticipantRow(pid,name,isHostUser,isMe,consented,observer){
     :observer?'<span style="font-size:11px;color:#8888ff;">👁 Observer</span>'
     :consented?'<span style="font-size:11px;color:var(--green);">🟢 Consented</span>'
     :'<span style="font-size:11px;color:#FF8844;">⚠ Not consented</span>';
+
+  // Volume slider for host to control how loud they hear each guest
+  const volControls=(!isMe&&!isHostUser&&!observer)?`
+    <div class="participant-vol">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:3px;text-align:center;">Hear vol</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="range" min="0" max="2" step="0.05" value="1"
+          class="vol-slider"
+          oninput="setGuestVolume('${pid}',this.value)"
+          title="How loud you hear ${name}" />
+        <span class="vol-label" id="vol-label-${pid}">100%</span>
+      </div>
+      <div class="clip-warn-row" id="clip-warn-${pid}" style="display:none;">
+        ⚠ Clipping on their end
+      </div>
+    </div>`:'';
+
+  const actionBtns=(!isMe&&!isHostUser)?`
+    <div style="display:flex;gap:4px;flex-shrink:0;">
+      <button class="btn-mute${p.muted?' muted':''}" onclick="toggleMute('${pid}')">${p.muted?'Unmute':'Mute'}</button>
+      <button class="btn-mute" onclick="kickGuest('${pid}')" style="color:#FF4444;border-color:rgba(255,68,68,0.3);">Kick</button>
+    </div>`:'';
+
   div.innerHTML=`
     <div class="participant-avatar">${initials(name)}</div>
     <div style="flex:1;min-width:0;">
       <div class="participant-name">${name}${isMe?' (You)':''}</div>
       <div class="participant-role">${badge}</div>
+      <div class="participant-meter" style="margin-top:6px;"><div class="participant-meter-fill" id="meter-${pid}"></div></div>
     </div>
-    <div class="participant-meter"><div class="participant-meter-fill" id="meter-${pid}"></div></div>
-    ${(!isMe&&!isHostUser)?`
-      <div style="display:flex;gap:4px;">
-        <button class="btn-mute${p.muted?' muted':''}" onclick="toggleMute('${pid}')">${p.muted?'Unmute':'Mute'}</button>
-        <button class="btn-mute" onclick="kickGuest('${pid}')" style="color:#FF4444;border-color:rgba(255,68,68,0.3);">Kick</button>
-      </div>`:''}
+    ${volControls}
+    ${actionBtns}
   `;
   return div;
 }
@@ -530,6 +610,92 @@ function setupHostControls(){
 }
 
 // ── Guest controls ──
+let guestGainNode=null, guestMonitorGainNode=null, guestAnalyser=null;
+
+function initGuestKnobs(){
+  // Draw initial knobs
+  drawRoomKnob($('guestInputKnob'),0,-20,20);
+  drawRoomKnob($('guestMonitorKnob'),-60,-60,0);
+
+  setupRoomKnobDrag($('guestInputKnob'),$('guestInputDb'),-20,20,'0',val=>{
+    drawRoomKnob($('guestInputKnob'),val,-20,20);
+    if(guestGainNode) guestGainNode.gain.value=Math.pow(10,val/20);
+  });
+  setupRoomKnobDrag($('guestMonitorKnob'),$('guestMonitorDb'),-60,0,'0',val=>{
+    drawRoomKnob($('guestMonitorKnob'),val,-60,0);
+    if(guestMonitorGainNode) guestMonitorGainNode.gain.value=val<=-59?0:Math.pow(10,val/20);
+  });
+
+  $('guestInputDb').addEventListener('change',()=>{
+    const val=parseFloat($('guestInputDb').value)||0;
+    drawRoomKnob($('guestInputKnob'),val,-20,20);
+    if(guestGainNode) guestGainNode.gain.value=Math.pow(10,val/20);
+  });
+  $('guestMonitorDb').addEventListener('change',()=>{
+    const val=parseFloat($('guestMonitorDb').value)||-60;
+    drawRoomKnob($('guestMonitorKnob'),val,-60,0);
+    if(guestMonitorGainNode) guestMonitorGainNode.gain.value=val<=-59?0:Math.pow(10,val/20);
+  });
+}
+
+function setupGuestAudioGraph(s){
+  // mic → gainNode → analyser → monitorGain → speakers
+  //                           → (recording stream)
+  if(!audioCtx||audioCtx.state==='closed') audioCtx=new AudioContext({sampleRate:48000});
+  const src=audioCtx.createMediaStreamSource(s);
+  guestGainNode=audioCtx.createGain(); guestGainNode.gain.value=1;
+  guestAnalyser=audioCtx.createAnalyser(); guestAnalyser.fftSize=1024;
+  guestMonitorGainNode=audioCtx.createGain(); guestMonitorGainNode.gain.value=0;
+  src.connect(guestGainNode);
+  guestGainNode.connect(guestAnalyser);
+  guestAnalyser.connect(guestMonitorGainNode);
+  guestMonitorGainNode.connect(audioCtx.destination);
+  // Draw meter
+  drawGuestMeter(guestAnalyser);
+  drawWave('guestWaveCanvas',guestAnalyser);
+}
+
+function drawGuestMeter(anal){
+  const buf=new Uint8Array(anal.frequencyBinCount);
+  function tick(){
+    try{anal.getByteTimeDomainData(buf);}catch{return;}
+    let max=0;for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>max)max=v;}
+    const pct=Math.min(100,Math.round(max*200));
+    const fill=$('guestMeterBar');if(fill)fill.style.setProperty('--level',pct+'%');
+    requestAnimationFrame(tick);
+  }tick();
+}
+
+// Room knob drawing (smaller, 72px)
+function drawRoomKnob(canvas,db,minDb,maxDb){
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height,cx=w/2,cy=h/2,r=cx-6;
+  const startAngle=Math.PI*0.75,endAngle=Math.PI*2.25;
+  const norm=Math.max(0,Math.min(1,(db-minDb)/(maxDb-minDb)));
+  const angle=startAngle+norm*(endAngle-startAngle);
+  ctx.clearRect(0,0,w,h);
+  ctx.beginPath();ctx.arc(cx,cy,r,startAngle,endAngle);ctx.strokeStyle='#2a2a2a';ctx.lineWidth=6;ctx.lineCap='round';ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r,startAngle,angle);ctx.strokeStyle='#E8FF47';ctx.lineWidth=6;ctx.lineCap='round';ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r-10,0,Math.PI*2);ctx.fillStyle='#1a1a1a';ctx.fill();
+  const px=cx+(r-13)*Math.cos(angle),py=cy+(r-13)*Math.sin(angle);
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.strokeStyle='#E8FF47';ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,2.5,0,Math.PI*2);ctx.fillStyle='#E8FF47';ctx.fill();
+}
+
+function setupRoomKnobDrag(canvas,input,minDb,maxDb,resetVal,onUpdate){
+  if(!canvas||!input)return;
+  let dragging=false,startY=0,startVal=0;
+  canvas.style.cursor='ns-resize';
+  canvas.addEventListener('mousedown',e=>{if(e.detail===2)return;dragging=true;startY=e.clientY;startVal=parseFloat(input.value);e.preventDefault();});
+  window.addEventListener('mousemove',e=>{if(!dragging)return;const d=(startY-e.clientY)*0.3;input.value=Math.max(minDb,Math.min(maxDb,startVal+d)).toFixed(1);onUpdate(parseFloat(input.value));});
+  window.addEventListener('mouseup',()=>{dragging=false;});
+  canvas.addEventListener('dblclick',()=>{input.value=resetVal;onUpdate(parseFloat(resetVal));});
+  input.addEventListener('dblclick',()=>{input.value=resetVal;onUpdate(parseFloat(resetVal));});
+  canvas.addEventListener('touchstart',e=>{dragging=true;startY=e.touches[0].clientY;startVal=parseFloat(input.value);e.preventDefault();},{passive:false});
+  window.addEventListener('touchmove',e=>{if(!dragging)return;const d=(startY-e.touches[0].clientY)*0.3;input.value=Math.max(minDb,Math.min(maxDb,startVal+d)).toFixed(1);onUpdate(parseFloat(input.value));});
+  window.addEventListener('touchend',()=>{dragging=false;});
+}
+
 function setupGuestControls(){
   $('guestLeaveBtn').addEventListener('click',()=>{
     if(!confirm('Leave this room?'))return;
