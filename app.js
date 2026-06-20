@@ -1,5 +1,42 @@
 'use strict';
 
+// ── Browser detection ──
+(function(){
+  const isSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.AudioContext);
+  if (!isSupported) {
+    const el = document.getElementById('unsupportedBrowser');
+    if (el) el.style.display = 'block';
+  }
+})();
+
+// ── Solo mode toggle ──
+const soloModeBtn = document.getElementById('soloModeBtn');
+const soloRecorder = document.getElementById('soloRecorder');
+const closeSoloBtn = document.getElementById('closeSoloBtn');
+const howItWorks = document.getElementById('howItWorks');
+const dismissPreflight = document.getElementById('dismissPreflight');
+const preflightCard = document.getElementById('preflightCard');
+
+if (soloModeBtn) {
+  soloModeBtn.addEventListener('click', () => {
+    soloRecorder.style.display = 'block';
+    if (howItWorks) howItWorks.style.display = 'none';
+    soloRecorder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+if (closeSoloBtn) {
+  closeSoloBtn.addEventListener('click', () => {
+    soloRecorder.style.display = 'none';
+    if (howItWorks) howItWorks.style.display = 'block';
+  });
+}
+if (dismissPreflight) {
+  dismissPreflight.addEventListener('click', () => {
+    preflightCard.style.display = 'none';
+    initMics();
+  });
+}
+
 const $ = id => document.getElementById(id);
 
 const micSelect     = $('micSelect');
@@ -197,19 +234,30 @@ async function initMics() {
   try {
     const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
     tmp.getTracks().forEach(t => t.stop());
-    permNotice.style.display = 'none';
+    if (permNotice) permNotice.style.display = 'none';
     const devices = await navigator.mediaDevices.enumerateDevices();
-    micSelect.innerHTML = '';
-    devices.filter(d => d.kind === 'audioinput').forEach((d, i) => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.textContent = d.label || `Microphone ${i + 1}`;
-      micSelect.appendChild(opt);
-    });
-    await startStream(micSelect.value);
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    if (mics.length === 0) {
+      const err = $('micNotFoundError'); if (err) err.style.display = 'block'; return;
+    }
+    if (micSelect) {
+      micSelect.innerHTML = '';
+      mics.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Microphone ${i + 1}`;
+        micSelect.appendChild(opt);
+      });
+    }
+    await startStream(micSelect ? micSelect.value : undefined);
   } catch(e) {
-    micSelect.innerHTML = '<option>Microphone permission denied</option>';
-    durStatus.textContent = 'Allow mic access to continue';
+    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      const err = $('micDeniedError'); if (err) err.style.display = 'block';
+      if (permNotice) permNotice.style.display = 'none';
+    } else {
+      const err = $('micNotFoundError'); if (err) err.style.display = 'block';
+    }
+    if (durStatus) durStatus.textContent = 'Microphone not available';
   }
 }
 
@@ -587,4 +635,4 @@ function addDownload(name, meta, url, filename) {
   `);
 }
 
-initMics();
+// initMics is called when user dismisses preflight checklist

@@ -10,130 +10,223 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .help-main { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
-    .help-section { margin-bottom: 32px; }
-    .help-section h2 { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 12px; letter-spacing: -0.02em; }
-    .help-section p { font-size: 15px; color: #aaa; line-height: 1.7; margin-bottom: 10px; }
-    .help-section ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-    .help-section ul li { font-size: 15px; color: #aaa; padding-left: 16px; position: relative; line-height: 1.6; }
-    .help-section ul li::before { content: '—'; position: absolute; left: 0; color: #555; }
-    .help-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
-    .help-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
-    .badge-host { background: var(--yellow-dim); color: var(--yellow); }
-    .badge-guest { background: rgba(68,255,136,0.1); color: var(--green); }
+    .help-main{max-width:720px;margin:0 auto;padding:40px 20px 80px;}
+    .help-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+    .help-nav a{font-size:13px;color:var(--text2);text-decoration:none;padding:5px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;transition:all 0.15s;}
+    .help-nav a:hover{color:var(--yellow);border-color:rgba(232,255,71,0.3);}
+    .help-section{margin-bottom:36px;scroll-margin-top:80px;}
+    .help-section h2{font-size:19px;font-weight:600;color:var(--text);margin-bottom:12px;letter-spacing:-0.02em;}
+    .help-section p{font-size:15px;color:#bbb;line-height:1.7;margin-bottom:10px;}
+    .help-section ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+    .help-section ul li{font-size:15px;color:#bbb;padding-left:18px;position:relative;line-height:1.6;}
+    .help-section ul li::before{content:'—';position:absolute;left:0;color:#555;}
+    hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
+    .help-badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:4px;margin-right:8px;vertical-align:middle;}
+    .badge-host{background:var(--yellow-dim);color:var(--yellow);}
+    .badge-guest{background:rgba(68,255,136,0.1);color:var(--green);}
+    .trouble-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;}
+    .trouble-q{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;cursor:pointer;}
+    .trouble-a{font-size:14px;color:#bbb;line-height:1.7;}
+    .browser-alert{background:rgba(232,255,71,0.07);border:1px solid rgba(232,255,71,0.2);border-radius:var(--radius);padding:14px 18px;margin-bottom:24px;font-size:14px;color:rgba(232,255,71,0.9);}
   </style>
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <div class="logo"><a href="index.html"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
-      <nav style="display:flex;align-items:center;gap:4px;">
-        <a href="index.html" style="font-size:14px;font-weight:500;color:var(--text2);text-decoration:none;padding:6px 12px;border-radius:6px;">Home</a>
-        <a href="rooms.html" style="font-size:14px;font-weight:500;color:var(--text2);text-decoration:none;padding:6px 12px;border-radius:6px;">My Rooms</a>
-        <a href="help.html" style="font-size:14px;font-weight:500;color:var(--yellow);text-decoration:none;padding:6px 12px;border-radius:6px;">Help</a>
+      <nav class="main-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="rooms.html" class="nav-link">My Rooms</a>
+        <a href="help.html" class="nav-link nav-active">Help</a>
       </nav>
     </div>
   </header>
 
   <main class="help-main">
-    <h1 style="font-size:28px;font-weight:600;letter-spacing:-0.03em;color:var(--text);margin-bottom:8px;">Help & Guide</h1>
-    <p style="font-size:15px;color:#777;margin-bottom:32px;">Everything you need to get the best out of Vox5000.</p>
+    <h1 style="font-size:26px;font-weight:600;letter-spacing:-0.02em;color:var(--text);margin-bottom:8px;">Help & Guide</h1>
+    <p style="font-size:15px;color:#777;margin-bottom:24px;">Everything you need to get the best out of Vox5000.</p>
 
-    <div class="help-section">
-      <h2>Solo Recording</h2>
-      <p>The home page recorder is for recording yourself only — no guests, no internet connection needed beyond loading the page.</p>
+    <div class="browser-alert">
+      ⚠ <strong>Browser recommendation:</strong> Use Google Chrome on a desktop or laptop for the most reliable experience. Mobile Safari on iPhone and iPad has limited Web Audio API support and may not record or upload reliably.
+    </div>
+
+    <!-- Quick jump links -->
+    <nav class="help-nav" aria-label="Help sections">
+      <a href="#quickstart">Quick start</a>
+      <a href="#solo">Solo recording</a>
+      <a href="#rooms">Interview rooms</a>
+      <a href="#guest">Guest guide</a>
+      <a href="#markers">Markers</a>
+      <a href="#levels">Gain & monitor</a>
+      <a href="#consent">Consent & privacy</a>
+      <a href="#bestpractice">Best settings</a>
+      <a href="#troubleshooting">Fix problems</a>
+    </nav>
+
+    <div class="help-section" id="quickstart">
+      <h2>Quick start</h2>
+      <p><strong>Recording yourself:</strong> Click "Record Myself" on the home page → complete the preflight checklist → select your mic → do a 5s test → hit Record.</p>
+      <p><strong>Recording an interview:</strong> Click "Start Interview Room" → enter your name → copy the invite link → send it to your guest → admit them when they appear → hit Record → hit Stop when done → download all tracks.</p>
+    </div>
+
+    <hr />
+
+    <div class="help-section" id="solo">
+      <h2>Solo recording</h2>
+      <p>The solo recorder is for recording yourself only — no guests, no internet connection required beyond loading the page.</p>
       <ul>
         <li>Select your microphone from the dropdown</li>
-        <li>Choose your format — MP3 for smaller files, WAV for broadcast quality masters</li>
+        <li>Choose MP3 for smaller files or WAV for a broadcast quality master</li>
         <li>Do a 5 second mic test before every session to check your levels</li>
-        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB (red)</li>
-        <li>Hit Record — the button also stops the recording when pressed again</li>
+        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB</li>
+        <li>Hit Record — the same button stops the recording when pressed again</li>
         <li>Your file downloads automatically when you stop — nothing is sent to any server</li>
       </ul>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
-      <h2>Interview Rooms</h2>
-      <p>Interview rooms let you record remote interviews with up to 3 guests. Everyone records locally on their own device for the best quality.</p>
-
-      <p><span class="help-badge badge-host">Host</span> Click "Start Interview Room" on the home page. Enter your name. Your room is created with a unique code.</p>
+    <div class="help-section" id="rooms">
+      <h2>Interview rooms — host guide</h2>
+      <p><span class="help-badge badge-host">Host</span>You create and control the room.</p>
       <ul>
-        <li>Copy the invite link and send it to your guests via WhatsApp, email or any messaging app</li>
-        <li>Guests appear in a waiting queue — admit or deny each one</li>
-        <li>You can see each guest's consent status — green tick means consented, eye icon means Observer</li>
-        <li>Hit Record — a 5 second countdown plays on all screens, then recording begins automatically</li>
-        <li>Use the Mark buttons during recording to drop Intro, Break, Outro and Clip timestamps</li>
-        <li>Hit Stop — guests automatically send their audio to you</li>
-        <li>Download each person's track separately, clearly labelled with their name</li>
-        <li>Download the consent log — keep it as legal proof</li>
+        <li>Click "Start Interview Room" from the home page</li>
+        <li>Enter your name — it labels your audio track</li>
+        <li>Copy the invite link and send it to guests via WhatsApp, email or any messaging app</li>
+        <li>Guests appear in a waiting queue on your screen — admit or deny each one</li>
+        <li>You can see each guest's consent status: 🟢 Consented, 👁 Observer, or ⚠ Not consented</li>
+        <li>Hit Record — a 5 second countdown plays on all screens, then recording begins on all devices simultaneously</li>
+        <li>Use the Mark buttons to drop Intro, Break, Outro and Clip timestamps during recording</li>
+        <li>Hit Stop — a 5 second warning appears, then guests automatically send their audio to you</li>
+        <li>Keep the page open until all tracks show a green tick</li>
+        <li>Download each person's WAV track, clearly labelled with their name</li>
+        <li>Download the consent log — keep it for your records</li>
       </ul>
+      <p style="margin-top:12px;"><strong>Muting and removing guests:</strong> Each guest row has a Mute button and a Kick button. Muted guests can still hear but their mic is silenced. Kicked guests are removed and shown a thank you message.</p>
+      <p><strong>Room persistence:</strong> Rooms are saved in your browser. If you navigate away and return to the same room URL, you go straight back in without re-entering your name.</p>
+    </div>
 
-      <p style="margin-top:16px;"><span class="help-badge badge-guest">Guest</span> Click the link the host sent you. No account or download needed.</p>
+    <hr />
+
+    <div class="help-section" id="guest">
+      <h2>Guest guide</h2>
+      <p><span class="help-badge badge-guest">Guest</span>Click the link your host sent you. No account or download needed.</p>
       <ul>
-        <li>Put headphones on before joining — speakers cause echo that ruins the recording</li>
-        <li>Enter your name — it will be used to label your audio track</li>
-        <li>Tick the consent checkbox if you agree to be recorded. If you don't tick it, you join as an Observer — you can hear and chat but won't be recorded</li>
+        <li><strong>Put headphones on first</strong> — speakers cause echo that ruins the recording for everyone</li>
+        <li>Enter your name — it will label your audio track in the final download</li>
+        <li>Tick the consent checkbox if you agree to be recorded. If you don't tick it, you join as an Observer — you can hear and chat but your mic will be off and you won't be recorded</li>
         <li>Wait for the host to admit you</li>
-        <li>When the host starts recording you'll see a countdown, then a red recording indicator</li>
-        <li>When the host stops, your audio uploads automatically — keep the page open until it says Done</li>
+        <li>When the host starts recording you'll see a 5 second countdown, then a red recording indicator appears</li>
+        <li>Speak normally — your audio is recorded locally on your device</li>
+        <li>When the host stops recording, your track uploads automatically to the host</li>
+        <li><strong>Keep the page open until you see the green Done message</strong> — closing it early will lose your track</li>
+        <li>After Done appears you can close the page</li>
       </ul>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
+    <div class="help-section" id="markers">
       <h2>Markers</h2>
-      <p>Use the Intro, Break, Outro and Clip buttons during recording to drop timestamp markers. When you stop, a text file downloads with all your markers listed with their timestamps — open it alongside your audio in Audacity to navigate quickly.</p>
+      <p>Use the Intro, Break, Outro and Clip buttons during recording to drop timestamp markers in real time. When you stop, a text file downloads alongside your audio with all markers listed. Open it in Audacity or your DAW to navigate quickly to key moments.</p>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
+    <div class="help-section" id="levels">
       <h2>Input Gain & Monitor</h2>
-      <p>The Input Gain knob boosts or cuts your microphone signal before it hits the recorder. Drag it up to increase, down to decrease. Double-click to reset to 0 dB.</p>
-      <p>The Monitor knob controls how loud you hear yourself in your headphones. It does not affect the recording — only what you hear. Double-click to reset.</p>
+      <p><strong>Input Gain</strong> — boosts or cuts your microphone signal before it hits the recorder. Drag the knob up to increase, down to decrease. Double-click the knob or the dB number to reset to 0 dB.</p>
+      <p><strong>Monitor</strong> — controls how loud you hear yourself in your headphones. It does not affect the recording at all — only what you hear. Double-click to reset. Start at –60 dB (silent) and raise until comfortable.</p>
+      <p><strong>The level meter</strong> — aim for peaks between –24 and –6 dB (the green zone). Above –6 dB the signal clips and distorts. Below –24 dB the recording will be too quiet.</p>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
-      <h2>My Rooms</h2>
-      <p>Rooms persist in your browser until you delete them. Use the My Rooms page to see all your rooms, open them, copy invite links, rename them, or delete them.</p>
-      <p>If you return to a room you created, you'll go straight in without needing to re-enter your name.</p>
+    <div class="help-section" id="consent">
+      <h2>Consent & privacy</h2>
+      <p><strong>Solo mode:</strong> Your audio is recorded entirely on your device. Nothing is sent to any server. Vox5000 never sees your audio.</p>
+      <p><strong>Interview rooms:</strong> Each participant records locally on their own device. When the session ends, guest tracks are transferred directly from each guest's browser to the host's browser — peer to peer. Vox5000 does not receive, store or process any audio.</p>
+      <p><strong>Consent log:</strong> When a guest enters a room, their name, consent decision, timestamp, IP address and browser details are recorded and stored locally in the host's session. This data never goes to Vox5000's servers. The host can download the consent log as a text file to keep for their own records. The log documents who consented to recording and who joined as an Observer.</p>
+      <p><strong>Observer mode:</strong> If a guest does not tick the consent checkbox, they join as an Observer. Their microphone is switched off and they cannot be recorded. They can still hear everyone and use the text chat.</p>
+      <p>Read the full <a href="privacy.html" style="color:var(--yellow);">Privacy Policy</a> for complete details.</p>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
-      <h2>Best practices for broadcast quality</h2>
+    <div class="help-section" id="bestpractice">
+      <h2>Best settings for broadcast quality</h2>
       <ul>
-        <li>Always use wired headphones — Bluetooth introduces latency and potential dropouts</li>
-        <li>Use an external USB or XLR interface microphone — not your laptop's built-in mic</li>
-        <li>Record in a quiet room — close doors and windows, turn off air conditioning</li>
-        <li>Do the 5 second mic test before every session</li>
-        <li>Keep levels peaking at around –12 dB — if the meter goes red you're clipping</li>
-        <li>Use Chrome on desktop for the most reliable experience</li>
-        <li>On mobile, use Chrome — Safari has limited Web Audio API support</li>
+        <li><strong>Browser:</strong> Google Chrome on desktop or laptop — most reliable</li>
+        <li><strong>Headphones:</strong> Wired — Bluetooth adds latency and potential dropouts</li>
+        <li><strong>Microphone:</strong> External USB or XLR interface mic — not your laptop's built-in mic</li>
+        <li><strong>Environment:</strong> Quiet room, doors closed, air conditioning off</li>
+        <li><strong>Level:</strong> Peaks at –12 dB on the meter — never hitting 0 dB red</li>
+        <li><strong>Format for broadcast:</strong> WAV 48kHz 24-bit for masters, MP3 320kbps for delivery</li>
+        <li><strong>Mobile:</strong> Chrome on Android is acceptable. iPhone Safari is not recommended for recording</li>
+        <li><strong>Long sessions:</strong> Keep your screen on and don't switch apps — especially on mobile</li>
       </ul>
     </div>
 
-    <hr class="help-divider" />
+    <hr />
 
-    <div class="help-section">
-      <h2>Privacy & data</h2>
-      <p>All audio recorded in solo mode stays on your device. Nothing is sent to any server. In interview rooms, guest audio is transferred directly from their browser to yours — peer to peer, not through any central server.</p>
-      <p>Read our full <a href="privacy.html" style="color:var(--yellow);">Privacy Policy</a> for details.</p>
+    <div class="help-section" id="troubleshooting">
+      <h2>Fix common problems</h2>
+
+      <div class="trouble-item">
+        <div class="trouble-q">🚫 My microphone is not showing up</div>
+        <div class="trouble-a">Make sure your mic is plugged in before loading the page. If it's a USB mic or interface, check it appears in your computer's sound settings. Refresh the page after plugging it in. If you're on Windows, check that Chrome has mic permission in Windows Settings → Privacy → Microphone.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">🔒 I clicked Deny on the microphone permission</div>
+        <div class="trouble-a">Click the padlock or microphone icon in Chrome's address bar → Site settings → Microphone → Change to Allow. Then refresh the page.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">🔊 I can hear myself echoing</div>
+        <div class="trouble-a">You or your guest is not using headphones. Speakers pick up the audio from the call and feed it back into the mic. Everyone in an interview room must use headphones or earphones.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">📊 The recording is too quiet or distorted</div>
+        <div class="trouble-a">Too quiet — increase the Input Gain knob until peaks hit around –12 dB. Distorted (red on waveform) — decrease Input Gain immediately. Aim for peaks between –24 and –6 dB.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">👥 The guest is not appearing in my waiting queue</div>
+        <div class="trouble-a">Make sure you sent them the correct link — it should contain your room code (e.g. room.html?r=XXXXXX). Both you and the guest need to be on the same page at the same time. Ask them to refresh and try again. Both should use Chrome on desktop if possible.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">📤 The guest upload is stuck or not progressing</div>
+        <div class="trouble-a">Both the host and guest must keep their page open and not lock their screen. If upload stalls, the guest should download their own track using the browser's download option before closing. Ask them to send it to you via WeTransfer or Google Drive as a fallback.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">📱 I'm on an iPhone and recording isn't working</div>
+        <div class="trouble-a">Safari on iOS has limited Web Audio API support. Use Chrome on iOS instead. For the most reliable experience, join from a desktop or laptop computer. Do not lock your screen or switch apps during recording on mobile.</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">💾 I can't find my downloaded file</div>
+        <div class="trouble-a">Check your Downloads folder. On Chrome, press Ctrl+J (Windows) or Cmd+Shift+J (Mac) to see recent downloads. Files are named with your name and a timestamp, e.g. Ian_HOST_2026-06-19.wav</div>
+      </div>
+
+      <div class="trouble-item">
+        <div class="trouble-q">🏠 My rooms have disappeared</div>
+        <div class="trouble-a">Rooms are stored in your browser's local storage. They can be lost if you clear your browser data, use private/incognito mode, or switch to a different browser or device. Always download your files before clearing browser data.</div>
+      </div>
+
     </div>
 
-    <div style="margin-top:32px;">
-      <a href="index.html" class="btn btn-ghost" style="text-decoration:none;font-size:14px;">← Back to recorder</a>
-    </div>
   </main>
 
   <footer class="footer">
-    <span>Vox5000 · <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a></span>
+    <div class="footer-inner">
+      <span>Vox5000 · Free broadcast audio recorder</span>
+      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, guest audio transfers directly from guest to host — Vox5000 does not store audio on any server.</span>
+      <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a>
+    </div>
   </footer>
 </body>
 </html>

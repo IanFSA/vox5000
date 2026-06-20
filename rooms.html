@@ -13,58 +13,91 @@
 <body>
   <header class="header">
     <div class="header-inner">
-      <div class="logo"><img src="logo.png" alt="VOX5000" class="logo-img" /></div>
+      <div class="logo"><a href="index.html"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav class="main-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="rooms.html" class="nav-link nav-active">My Rooms</a>
+        <a href="help.html" class="nav-link">Help</a>
+      </nav>
     </div>
   </header>
+
   <main class="main">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-      <h1 style="font-size:22px; font-weight:600; letter-spacing:-0.02em;">My Rooms</h1>
-      <a href="room.html" class="btn btn-record" style="text-decoration:none; font-size:13px; padding:8px 14px;">+ New Room</a>
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <h1 style="font-size:24px;font-weight:600;letter-spacing:-0.02em;color:var(--text);margin-bottom:6px;">My Rooms</h1>
+        <p style="font-size:15px;color:var(--text2);max-width:560px;line-height:1.6;">Create a room to record a remote interview. Invite guests with a link, admit them when they arrive, then download separate audio tracks when the session ends.</p>
+      </div>
+      <a href="room.html" class="btn btn-record" style="text-decoration:none;white-space:nowrap;">+ New Interview Room</a>
     </div>
-    <p style="font-size:14px; color:var(--text2); margin-bottom:20px;">Rooms are stored in your browser. They persist until you delete them.</p>
+
+    <div class="notice-bar" style="margin-bottom:20px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+      <span>Rooms are saved in <strong>this browser only</strong>. They will not appear on another device or browser. Clearing your browser data may delete them.</span>
+    </div>
+
     <div id="roomsList"></div>
-    <div id="noRooms" style="display:none;" class="card" >
-      <p style="font-size:14px; color:var(--text2); text-align:center; padding:20px 0;">No rooms yet. <a href="room.html" style="color:var(--yellow);">Create your first room.</a></p>
+
+    <div id="noRooms" style="display:none;">
+      <div class="card" style="text-align:center;padding:40px 20px;">
+        <div style="font-size:32px;margin-bottom:16px;">🎙</div>
+        <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:8px;">No rooms yet</div>
+        <p style="font-size:14px;color:var(--text2);margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.6;">Create your first interview room to start recording remote guests with separate audio tracks.</p>
+        <a href="room.html" class="btn btn-record" style="text-decoration:none;display:inline-flex;">Create Interview Room</a>
+      </div>
     </div>
-    <div style="margin-top:20px;">
-      <a href="index.html" class="btn btn-ghost" style="text-decoration:none; font-size:13px;">← Back to recorder</a>
-    </div>
+
   </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Vox5000 · Free broadcast audio recorder</span>
+      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, guest audio transfers directly from guest to host — Vox5000 does not store audio on any server.</span>
+      <a href="privacy.html" style="color:var(--text3);">Privacy Policy</a>
+    </div>
+  </footer>
+
   <script>
-    function getRooms() { try { return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}'); } catch { return {}; } }
-    function saveRooms(r) { localStorage.setItem('vox5000_rooms', JSON.stringify(r)); }
-    function render() {
-      const rooms = getRooms();
-      const list = $('roomsList'), none = $('noRooms');
-      const keys = Object.keys(rooms);
-      if (keys.length === 0) { list.innerHTML=''; none.style.display='block'; return; }
+    function getRooms(){try{return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}');}catch{return{};}}
+    function saveRooms(r){localStorage.setItem('vox5000_rooms',JSON.stringify(r));}
+    function $(id){return document.getElementById(id);}
+
+    function render(){
+      const rooms=getRooms(),list=$('roomsList'),none=$('noRooms');
+      const keys=Object.keys(rooms);
+      if(keys.length===0){list.innerHTML='';none.style.display='block';return;}
       none.style.display='none';
-      list.innerHTML = keys.map(id => {
-        const r = rooms[id];
-        const date = r.created ? new Date(r.created).toLocaleDateString() : 'Unknown';
-        return `
-          <div class="card" style="margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      list.innerHTML=keys.map(id=>{
+        const r=rooms[id];
+        const date=r.created?new Date(r.created).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'Unknown';
+        return `<div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div>
-              <div style="font-size:15px; font-weight:500; color:var(--text); margin-bottom:4px;">${r.name||'Interview Room'}</div>
-              <div style="font-family:var(--mono); font-size:12px; color:var(--yellow);">${id}</div>
-              <div style="font-size:12px; color:var(--text3); margin-top:4px;">Created ${date}</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;">${r.name||'Interview Room'}</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--yellow);margin-bottom:4px;">Room code: ${id}</div>
+              <div style="font-size:12px;color:var(--text3);">Created ${date}</div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <a href="room.html?r=${id}" class="btn btn-ghost" style="text-decoration:none; font-size:13px; padding:7px 12px;">Open</a>
-              <button onclick="copyLink('${id}')" class="btn btn-ghost" style="font-size:13px; padding:7px 12px;">Copy link</button>
-              <button onclick="deleteRoom('${id}')" class="btn btn-ghost" style="font-size:13px; padding:7px 12px; color:#FF4444; border-color:rgba(255,68,68,0.3);">Delete</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <a href="room.html?r=${id}" class="btn btn-ghost" style="text-decoration:none;font-size:13px;padding:7px 14px;">Open Room</a>
+              <button onclick="copyLink('${id}')" class="btn btn-ghost" style="font-size:13px;padding:7px 14px;">📋 Copy Link</button>
+              <button onclick="deleteRoom('${id}')" class="btn btn-ghost" style="font-size:13px;padding:7px 14px;color:#FF4444;border-color:rgba(255,68,68,0.3);">Delete</button>
             </div>
           </div>
-        `;
+        </div>`;
       }).join('');
     }
-    window.deleteRoom = function(id) {
-      if (confirm('Delete this room?')) { const r=getRooms(); delete r[id]; saveRooms(r); render(); }
+
+    window.deleteRoom=function(id){
+      if(confirm('Delete this room? This cannot be undone.')){
+        const r=getRooms();delete r[id];saveRooms(r);render();
+      }
     };
-    window.copyLink = function(id) {
-      navigator.clipboard.writeText(`${location.origin}${location.pathname.replace('rooms.html','room.html')}?r=${id}`).then(()=>alert('Link copied!'));
+    window.copyLink=function(id){
+      const url=`${location.origin}/room.html?r=${id}`;
+      navigator.clipboard.writeText(url).then(()=>alert('Invite link copied to clipboard!'));
     };
-    function $(id){return document.getElementById(id);}
+
     render();
   </script>
 </body>
