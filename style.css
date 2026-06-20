@@ -668,3 +668,77 @@ body {
   .card { padding: 18px; }
   .nav-cta { display: none; }
 }
+
+/* ── Level sliders ── */
+.level-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.level-slider-label {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.level-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  outline: none;
+  cursor: pointer;
+}
+.level-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--yellow);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 0 3px rgba(223,255,0,0.15);
+}
+.level-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--yellow);
+  cursor: pointer;
+  border: none;
+}
+.level-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(223,255,0,0.3);
+}
+.level-slider-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--yellow);
+  min-width: 48px;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* ── Share panel buttons ── */
+.share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  font-family: var(--font);
+  transition: opacity 0.15s, transform 0.1s;
+}
+.share-btn:hover { opacity: 0.88; }
+.share-btn:active { transform: scale(0.97); }

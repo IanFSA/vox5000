@@ -4,207 +4,347 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vox5000 — Interview Room</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="room.css" />
 </head>
 <body>
 
-  <!-- ── NAVIGATION ── -->
-  <header class="header">
+  <header class="header" role="banner">
     <div class="header-inner">
-      <div class="logo">
-        <a href="#" id="logoHomeLink"><img src="logo.png" alt="VOX5000" class="logo-img" /></a>
-      </div>
-      <nav class="main-nav" id="mainNav">
+      <div class="logo"><a href="#" id="logoHomeLink" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav class="main-nav" aria-label="Main navigation">
         <a href="#" id="navHome" class="nav-link">Home</a>
-        <a href="rooms.html" id="navRooms" class="nav-link">My Rooms</a>
-        <a href="help.html" id="navHelp" class="nav-link">Help</a>
+        <a href="rooms.html" class="nav-link">My Rooms</a>
+        <a href="help.html" class="nav-link">Help</a>
       </nav>
-      <div class="on-air" id="onAir"><span class="on-air-dot"></span><span>ON AIR</span></div>
+      <div class="on-air" id="onAir" aria-live="assertive"><span class="on-air-dot" aria-hidden="true"></span><span>ON AIR</span></div>
     </div>
   </header>
 
-  <!-- ── SCREEN: Headphone check ── -->
-  <div class="screen" id="headphoneScreen">
+  <!-- ── SCREEN 1: Headphone check ── -->
+  <div class="screen" id="headphoneScreen" role="main">
     <div class="screen-card">
-      <img src="logo.png" alt="VOX5000" style="height:28px;margin-bottom:24px;" />
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
 
-      <!-- Room name field — only shown for host -->
-      <div id="roomNameSection" style="display:none;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border);">
-        <div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Name this room</div>
-        <input type="text" id="roomNameInput" class="name-input" placeholder="e.g. Morning Show — John Smith" maxlength="60" autocomplete="off" style="margin-bottom:4px;" />
-        <div style="font-size:12px;color:var(--text3);">Leave blank to use a random room code</div>
+      <!-- Room name — host only -->
+      <div id="roomNameSection" style="display:none;" class="room-name-input-section">
+        <div class="room-name-input-label">Name this room</div>
+        <input type="text" id="roomNameInput" class="name-input" placeholder="e.g. Morning Show — John Smith" maxlength="60" autocomplete="off" />
+        <div class="room-name-hint">Leave blank to use a random room code</div>
       </div>
 
-      <h2 class="screen-title">Before you enter</h2>
+      <div class="screen-step">Step 1 of 3</div>
+      <h1 class="screen-title">Before you enter</h1>
       <p class="screen-sub">Are you wearing headphones or earphones right now?</p>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+      <div style="display:flex;flex-direction:column;gap:10px;">
         <button class="btn btn-record" id="hasHeadphones" style="justify-content:center;">✓ Yes — I have headphones on</button>
         <button class="btn btn-ghost" id="noHeadphones" style="justify-content:center;">✗ No — I'm using speakers</button>
       </div>
     </div>
   </div>
 
-  <!-- ── SCREEN: Feedback warning ── -->
-  <div class="screen" id="feedbackWarnScreen" style="display:none;">
+  <!-- ── SCREEN 1b: Feedback warning ── -->
+  <div class="screen" id="feedbackWarnScreen" style="display:none;" role="alertdialog" aria-labelledby="feedbackTitle">
     <div class="screen-card">
-      <img src="logo.png" alt="VOX5000" style="height:28px;margin-bottom:24px;" />
-      <h2 class="screen-title" style="color:#FF4444;">⚠ Feedback Warning</h2>
-      <p class="screen-sub">Without headphones your speakers will cause echo and feedback that ruins the recording for everyone.</p>
-      <p class="screen-sub" style="margin-top:0;">Please put on headphones or earphones before continuing.</p>
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
+      <h2 class="screen-title" id="feedbackTitle" style="color:var(--red);">⚠ Feedback Warning</h2>
+      <p class="screen-sub">Without headphones your speakers will cause echo and feedback that ruins the recording for everyone. Please put on headphones or earphones before continuing.</p>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button class="btn btn-record" id="nowHasHeadphones" style="justify-content:center;">✓ I've put headphones on — continue</button>
-        <button class="btn btn-ghost" id="continueAnyway" style="justify-content:center;color:#FF4444;border-color:rgba(255,68,68,0.3);">Continue anyway (not recommended)</button>
+        <button class="btn btn-ghost" id="continueAnyway" style="justify-content:center;color:var(--red);border-color:rgba(255,59,59,0.3);">Continue anyway (not recommended)</button>
       </div>
     </div>
   </div>
 
-  <!-- ── SCREEN: Name + Consent ── -->
-  <div class="screen" id="nameScreen" style="display:none;">
+  <!-- ── SCREEN 2: Name entry ── -->
+  <div class="screen" id="nameScreen" style="display:none;" role="main">
     <div class="screen-card">
-      <img src="logo.png" alt="VOX5000" style="height:28px;margin-bottom:24px;" />
-      <h2 class="screen-title">Join the room</h2>
-      <p class="screen-sub">Enter your name. It will be used to label your audio track.</p>
-      <input type="text" id="participantName" class="name-input" placeholder="Your full name" maxlength="60" autocomplete="off" />
-      <div id="nameError" class="name-error" style="display:none;">Please enter your name to continue.</div>
-      <div id="consentSection" style="display:none;">
-        <div class="consent-box">
-          <div class="consent-title">Recording Consent</div>
-          <p class="consent-text">This session may be recorded for broadcast, journalistic, podcast or professional use. Your voice will be saved as a separate audio track by the host.</p>
-          <p class="consent-text" style="margin-top:8px;">Your name, consent decision, IP address, browser details and the time you joined will be recorded in a consent log stored locally by the host. This log does not go to Vox5000's servers.</p>
-          <label class="consent-label">
-            <input type="checkbox" id="consentCheck" />
-            <span>I consent to being recorded in this session.</span>
-          </label>
-          <div class="observer-note">
-            <strong>Don't want to be recorded?</strong> Leave the checkbox unticked and you'll join as an <strong>Observer</strong> — your microphone will be off and your voice will not be recorded. You can still hear everyone and use the chat.
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
+      <div class="screen-step">Step 2 of 3</div>
+      <h1 class="screen-title">What's your name?</h1>
+      <p class="screen-sub">Your name labels your audio track in the final recording.</p>
+      <input type="text" id="participantName" class="name-input" placeholder="Your full name" maxlength="60" autocomplete="off" aria-label="Your name" />
+      <div id="nameError" class="name-error" style="display:none;" role="alert">Please enter your name to continue.</div>
+      <button class="btn btn-record" id="enterRoomBtn" style="width:100%;justify-content:center;margin-top:14px;">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 2b: Consent (guests only) ── -->
+  <div class="screen" id="consentScreen" style="display:none;" role="main">
+    <div class="screen-card" style="max-width:480px;">
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
+      <div class="screen-step">Step 3 of 4</div>
+      <h1 class="screen-title">Will you be recorded?</h1>
+      <p class="screen-sub">This session is being recorded. Choose how you want to participate.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+        <button id="consentBtnYes" onclick="chooseConsent(true)" class="consent-choice-btn consent-choice-yes" style="text-align:left;padding:18px 20px;border-radius:10px;background:rgba(0,229,107,0.08);border:2px solid rgba(0,229,107,0.2);cursor:pointer;font-family:var(--font);transition:all 0.15s;width:100%;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span style="font-size:28px;" aria-hidden="true">🟢</span>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:3px;">Yes — record me</div>
+              <div style="font-size:13px;color:var(--text2);">I consent to being recorded in this session</div>
+            </div>
           </div>
-        </div>
+        </button>
+        <button id="consentBtnNo" onclick="chooseConsent(false)" class="consent-choice-btn consent-choice-no" style="text-align:left;padding:18px 20px;border-radius:10px;background:rgba(120,120,255,0.06);border:2px solid rgba(120,120,255,0.15);cursor:pointer;font-family:var(--font);transition:all 0.15s;width:100%;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span style="font-size:28px;" aria-hidden="true">👁</span>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:3px;">No — listen only</div>
+              <div style="font-size:13px;color:var(--text2);">Join as Observer — mic off, not recorded, can still chat</div>
+            </div>
+          </div>
+        </button>
       </div>
-      <button class="btn btn-record" id="enterRoomBtn" style="width:100%;justify-content:center;margin-top:12px;">Enter Room →</button>
-      <p class="screen-note" style="margin-top:14px;">By entering this room you acknowledge that a consent log will be created and stored by the host.</p>
+      <p style="font-size:11px;color:var(--text3);line-height:1.6;">Your name, choice, timestamp, IP address and browser details are logged by the host only — not stored by Vox5000.</p>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 3: Pre-recording level check (host) ── -->
+  <div class="screen" id="levelCheckScreen" style="display:none;" role="main">
+    <div class="screen-card" style="max-width:500px;">
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
+      <div class="screen-step">Step 3 of 3</div>
+      <h1 class="screen-title">Check your mic level</h1>
+      <p class="screen-sub">Speak normally and make sure your level is in the green zone before starting.</p>
+      <div class="meter-wrap" style="margin-bottom:6px;" role="meter" aria-label="Mic level">
+        <div class="meter-bar" id="levelCheckMeter"></div>
+        <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:20px;display:flex;gap:12px;">
+        <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
+        <span style="color:var(--red);">● Clipping: above –6 dB</span>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-record" id="levelCheckOk" style="flex:1;justify-content:center;">Looks good — enter room</button>
+        <button class="btn btn-ghost" id="levelCheckSkip" style="justify-content:center;">Skip</button>
+      </div>
     </div>
   </div>
 
   <!-- ── SCREEN: Waiting ── -->
-  <div class="screen" id="waitingScreen" style="display:none;">
+  <div class="screen" id="waitingScreen" style="display:none;" role="status" aria-live="polite">
     <div class="screen-card" style="text-align:center;">
-      <img src="logo.png" alt="VOX5000" style="height:28px;margin-bottom:24px;" />
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
       <h2 class="screen-title" id="waitingTitle">Waiting to be admitted</h2>
       <p class="screen-sub" id="waitingSub">The host will let you in shortly. Keep this page open.</p>
-      <div class="waiting-spinner"></div>
+      <div class="waiting-spinner" aria-hidden="true"></div>
       <p style="font-size:14px;color:var(--text2);margin-top:8px;" id="waitingNameDisplay"></p>
     </div>
   </div>
 
   <!-- ── SCREEN: Countdown ── -->
-  <div class="screen" id="countdownScreen" style="display:none;">
+  <div class="screen" id="countdownScreen" style="display:none;" role="status" aria-live="assertive">
     <div class="screen-card" style="text-align:center;">
-      <p style="font-size:16px;color:var(--text2);margin-bottom:16px;font-weight:500;">Recording starts in</p>
-      <div class="countdown-number" id="countdownNumber">5</div>
-      <p style="font-size:14px;color:#777;margin-top:16px;">Stay quiet — recording is about to begin</p>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">Recording starts in</p>
+      <div class="countdown-number" id="countdownNumber" aria-live="assertive">5</div>
+      <p style="font-size:13px;color:var(--text3);margin-top:20px;">Stay quiet — recording is about to begin</p>
     </div>
   </div>
 
-  <!-- ── SCREEN: Thank you (guest exit) ── -->
-  <div class="screen" id="thankyouScreen" style="display:none;">
+  <!-- ── SCREEN: Thank you ── -->
+  <div class="screen" id="thankyouScreen" style="display:none;" role="main">
     <div class="screen-card" style="text-align:center;">
-      <img src="logo.png" alt="VOX5000" style="height:28px;margin-bottom:24px;" />
+      <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
       <h2 class="screen-title" style="color:var(--green);">✓ Thank you!</h2>
       <p class="screen-sub" id="thankyouMsg">Thank you for using Vox5000.</p>
-      <p style="font-size:13px;color:#777;margin-top:16px;">Returning to home in <span id="thankyouCountdown">5</span> seconds…</p>
+      <p style="font-size:13px;color:var(--text3);margin-top:16px;">Returning to home in <span id="thankyouCountdown">5</span> seconds…</p>
+    </div>
+  </div>
+
+  <!-- ── SHARE PANEL ── -->
+  <div id="sharePanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;padding:20px;" role="dialog" aria-modal="true" aria-labelledby="sharePanelTitle">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:420px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 id="sharePanelTitle" style="font-size:17px;font-weight:700;color:var(--text);">Invite guests</h2>
+        <button id="closePanelBtn" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px;" aria-label="Close share panel">✕</button>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-family:var(--mono);font-size:12px;color:var(--text2);word-break:break-all;" id="shareLinkDisplay"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="share-btn" id="shareWhatsApp" style="background:#25D366;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
+        <button class="share-btn" id="shareTelegram" style="background:#229ED9;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+          Telegram
+        </button>
+        <button class="share-btn" id="shareEmail" style="background:var(--bg3);border:1px solid var(--border-strong);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+          Email
+        </button>
+        <button class="share-btn" id="shareSMS" style="background:var(--bg3);border:1px solid var(--border-strong);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          SMS
+        </button>
+        <button class="share-btn" id="shareNative" style="background:var(--yellow);color:#000;grid-column:1/-1;display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Share via your apps
+        </button>
+        <button class="share-btn" id="shareCopyLink" style="background:var(--bg3);border:1px solid var(--border-strong);grid-column:1/-1;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <span id="copyLinkText">Copy link</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GUEST WAITING NOTIFICATION (host) ── -->
+  <div id="guestAlert" style="display:none;position:fixed;top:70px;right:20px;z-index:150;background:var(--bg2);border:2px solid var(--yellow);border-radius:var(--radius);padding:16px 20px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);" role="alert" aria-live="assertive">
+    <div style="font-size:14px;font-weight:700;color:var(--yellow);margin-bottom:6px;">⚡ Guest waiting to join</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;" id="guestAlertName"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-admit" id="guestAlertAdmit">Admit now</button>
+      <button class="btn-deny" id="guestAlertDismiss">View queue</button>
+    </div>
+  </div>
+
+  <!-- ── SESSION SUMMARY PANEL ── -->
+  <div id="summaryPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;padding:20px;" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:480px;">
+      <h2 id="summaryTitle" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:20px;">Session Summary</h2>
+      <div id="summaryContent"></div>
+
+      <!-- Format selector -->
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Download Format</div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <label class="format-option" style="flex:1;">
+            <input type="radio" name="dlFormat" value="mp3" checked />
+            <div class="format-option-card">
+              <div class="format-option-title">MP3</div>
+              <div class="format-option-desc">Compressed · Smaller files · Great for sharing</div>
+            </div>
+          </label>
+          <label class="format-option" style="flex:1;">
+            <input type="radio" name="dlFormat" value="wav" />
+            <div class="format-option-card">
+              <div class="format-option-title">WAV</div>
+              <div class="format-option-desc">Lossless · Broadcast master · Larger files</div>
+            </div>
+          </label>
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:16px;" id="qualityNote">MP3 320 kbps — high quality compressed audio</div>
+      </div>
+
+      <button class="btn btn-record" id="summaryProceedBtn" style="width:100%;justify-content:center;">
+        Process & Download Tracks
+      </button>
     </div>
   </div>
 
   <!-- ── HOST ROOM ── -->
   <div id="hostRoom" style="display:none;">
-    <main class="room-main">
+    <main class="room-main" role="main">
 
       <div class="room-topbar">
         <div class="room-info">
           <span class="room-label">Room</span>
           <span class="room-code" id="roomCodeDisplay"></span>
           <span class="room-name-display" id="roomNameDisplay"></span>
-          <button class="btn btn-ghost btn-sm" id="renameRoomBtn" style="font-size:12px;padding:4px 10px;">✏ Rename</button>
+          <button class="btn btn-ghost btn-sm" id="renameRoomBtn" style="font-size:11px;padding:4px 10px;">✏ Rename</button>
         </div>
         <div class="room-topbar-actions">
-          <button class="btn btn-ghost btn-sm" id="copyLinkBtn">📋 Copy invite link</button>
-          <button class="btn btn-ghost btn-sm" id="deleteRoomBtn" style="color:#FF4444;border-color:rgba(255,68,68,0.3);">🗑 Delete room</button>
+          <button class="btn btn-record btn-sm" id="copyLinkBtn" aria-label="Share invite link">📤 Invite guests</button>
+          <button class="btn btn-ghost btn-sm" id="deleteRoomBtn" style="color:var(--red);border-color:rgba(255,59,59,0.25);">🗑 Delete</button>
         </div>
+      </div>
+
+      <!-- 60 min warning -->
+      <div id="sixtyMinWarning" style="display:none;" class="notice-bar" role="alert">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+        <span><strong>60 minutes reached.</strong> Keep all screens active and avoid switching apps, especially on mobile.</span>
       </div>
 
       <div class="room-grid">
         <div class="room-left">
 
-          <div class="card" style="margin-bottom:16px;">
-            <div class="card-label" style="font-size:13px;color:var(--text2);margin-bottom:14px;">
-              PARTICIPANTS <span id="participantCount" style="color:var(--yellow);">1/4</span>
-              <span style="float:right;font-size:11px;color:#666;">🟢 Consented &nbsp; 👁 Observer</span>
+          <div class="card" role="region" aria-label="Participants">
+            <div class="card-label">
+              Participants <span id="participantCount" style="color:var(--yellow);">1/6</span>
+              <span style="float:right;font-size:10px;color:var(--text3);">🟢 Consented &nbsp; 👁 Observer</span>
             </div>
-            <div id="participantsList"></div>
+            <div id="participantsList" aria-live="polite"></div>
             <div id="waitingQueue" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-              <div style="font-size:13px;font-weight:600;color:var(--yellow);margin-bottom:10px;">⚡ Waiting to join</div>
+              <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:10px;letter-spacing:0.04em;">⚡ WAITING TO JOIN</div>
               <div id="waitingList"></div>
             </div>
           </div>
 
-          <div class="card recorder-card" style="margin-bottom:16px;">
+          <div class="card recorder-card" role="region" aria-label="Recording controls">
             <div class="duration-display">
-              <span class="duration" id="hostDuration">00:00:00</span>
+              <span class="duration" id="hostDuration" aria-live="polite">00:00:00</span>
               <span class="duration-status" id="hostDurStatus">Ready to record</span>
             </div>
-            <div class="controls" style="margin-bottom:12px;">
-              <button class="btn btn-record" id="recBtn"><span class="rec-dot"></span> Record</button>
-              <button class="btn btn-ghost" id="pauseBtn" disabled>⏸ Pause</button>
+            <div class="controls">
+              <button class="btn btn-record" id="recBtn" aria-label="Start or stop recording"><span class="rec-dot" aria-hidden="true"></span> Record</button>
+              <button class="btn btn-ghost" id="pauseBtn" disabled aria-label="Pause or resume">⏸ Pause</button>
             </div>
-            <div class="markers">
-              <span class="markers-label">Mark</span>
-              <button class="btn btn-marker" id="m1" disabled>Intro</button>
-              <button class="btn btn-marker" id="m2" disabled>Break</button>
-              <button class="btn btn-marker" id="m3" disabled>Outro</button>
-              <button class="btn btn-marker" id="m4" disabled>Clip</button>
+            <div class="markers" role="group" aria-label="Timestamp markers">
+              <span class="markers-label" aria-hidden="true">Mark</span>
+              <button class="btn-marker" id="m1" disabled>Intro</button>
+              <button class="btn-marker" id="m2" disabled>Break</button>
+              <button class="btn-marker" id="m3" disabled>Outro</button>
+              <button class="btn-marker" id="m4" disabled>Clip</button>
             </div>
-            <div class="marker-log" id="markerLog"></div>
+            <div class="marker-log" id="markerLog" aria-live="polite"></div>
           </div>
 
-          <div class="card" id="consentNotice" style="display:none;margin-bottom:16px;border-color:rgba(68,255,136,0.2);">
-            <div style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:6px;">📋 Consent Log Ready</div>
-            <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Download and keep this as legal proof of participant consent.</p>
+          <div class="card" id="consentNotice" style="display:none;border-color:rgba(0,229,107,0.2);">
+            <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px;">📋 Consent Log Ready</div>
+            <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Download and keep this as a record of participant consent.</p>
             <a class="dl-btn" id="consentLogBtn" style="display:inline-flex;">↓ Download Consent Log</a>
           </div>
 
-          <div class="card" id="transferCard" style="display:none;margin-bottom:16px;">
-            <div class="card-label" style="font-size:13px;margin-bottom:14px;">COLLECTING GUEST TRACKS</div>
+          <div class="card" id="transferCard" style="display:none;">
+            <div class="card-label" style="margin-bottom:14px;">Collecting Guest Tracks</div>
             <div id="transferList"></div>
             <p style="font-size:13px;color:var(--text2);margin-top:12px;" id="transferNote">Keep this page open until all tracks are received.</p>
           </div>
 
           <div class="card" id="dlSection" style="display:none;">
-            <div class="card-label" style="font-size:13px;margin-bottom:14px;">DOWNLOADS READY</div>
+            <div class="card-label" style="margin-bottom:14px;">Downloads Ready</div>
             <div id="dlGrid"></div>
           </div>
 
         </div>
 
         <div class="room-right">
-          <div class="waveform-section" style="margin-bottom:16px;">
+          <div class="waveform-section" role="img" aria-label="Live waveform monitor">
             <div class="wave-header">
-              <span class="wave-title">WAVEFORM MONITOR</span>
-              <span class="wave-hint">Red = clipping</span>
+              <span class="wave-title">Waveform Monitor</span>
+              <span class="wave-hint" aria-hidden="true">Red = clipping</span>
             </div>
-            <canvas id="hostWaveCanvas" class="wave-canvas" height="140"></canvas>
+            <canvas id="hostWaveCanvas" class="wave-canvas" height="140" aria-hidden="true"></canvas>
           </div>
-          <div class="card chat-card">
-            <div class="card-label" style="font-size:13px;margin-bottom:14px;">CHAT</div>
-            <div class="chat-messages" id="hostChatMessages">
+
+          <!-- Host level sliders — always visible -->
+          <div class="card" role="region" aria-label="Host level controls">
+            <div class="card-label" style="margin-bottom:14px;">Your Levels</div>
+            <div class="level-slider-row">
+              <label class="level-slider-label" for="hostInputSlider">Input Gain</label>
+              <input type="range" id="hostInputSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
+              <span class="level-slider-val" id="hostInputVal">0 dB</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:12px;padding-left:90px;">How loud your mic is recorded</div>
+            <div class="level-slider-row">
+              <label class="level-slider-label" for="hostMonitorSlider">Monitor</label>
+              <input type="range" id="hostMonitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
+              <span class="level-slider-val" id="hostMonitorVal">Off</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);padding-left:90px;">Headphone volume — doesn't affect recording</div>
+          </div>
+          <div class="card chat-card" role="region" aria-label="Chat">
+            <div class="card-label">Chat</div>
+            <div class="chat-messages" id="hostChatMessages" aria-live="polite" aria-label="Chat messages">
               <div class="chat-system">Chat is active. Use this if audio isn't working.</div>
             </div>
             <div class="chat-input-row">
-              <input type="text" id="hostChatInput" class="chat-input" placeholder="Type a message…" maxlength="300" />
+              <input type="text" id="hostChatInput" class="chat-input" placeholder="Type a message…" maxlength="300" aria-label="Chat message" />
               <button class="btn btn-record btn-sm" id="hostChatSend">Send</button>
             </div>
           </div>
@@ -215,112 +355,100 @@
 
   <!-- ── GUEST ROOM ── -->
   <div id="guestRoom" style="display:none;">
-    <main class="room-main" style="max-width:680px;">
+    <main class="room-main" style="max-width:700px;" role="main">
 
-      <div class="card" style="margin-bottom:16px;background:rgba(232,255,71,0.05);border-color:rgba(232,255,71,0.2);">
+      <div class="card" style="margin-bottom:14px;background:rgba(223,255,0,0.04);border-color:var(--yellow-border);">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div>
-            <div style="font-size:16px;font-weight:600;color:var(--text);" id="guestNameDisplay"></div>
-            <div style="font-size:13px;color:var(--text2);margin-top:2px;" id="guestStatusDisplay">Connected — waiting for host to start</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:16px;font-weight:700;color:var(--text);" id="guestNameDisplay"></div>
+            <div style="font-size:13px;color:var(--text2);margin-top:2px;" id="guestStatusDisplay" aria-live="polite">Connected — waiting for host to start</div>
           </div>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span id="guestConsentBadge" style="font-size:12px;padding:3px 10px;border-radius:4px;font-weight:600;"></span>
-            <span style="font-family:var(--mono);font-size:12px;color:var(--yellow);background:var(--yellow-dim);padding:3px 10px;border-radius:4px;">Room: <span id="guestRoomCode"></span></span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span id="guestConsentBadge" style="font-size:11px;padding:3px 10px;border-radius:4px;font-weight:700;"></span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-border);padding:3px 10px;border-radius:4px;">Room: <span id="guestRoomCode"></span></span>
           </div>
         </div>
       </div>
 
-      <div class="card" id="observerBanner" style="display:none;margin-bottom:16px;border-color:rgba(100,100,255,0.3);background:rgba(100,100,255,0.05);">
-        <div style="font-size:15px;font-weight:600;color:#8888ff;margin-bottom:4px;">👁 You are an Observer</div>
+      <!-- Guest timer -->
+      <div id="guestTimerCard" style="display:none;margin-bottom:14px;" class="card">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--red);animation:blink 1s infinite;flex-shrink:0;" aria-hidden="true"></div>
+          <span style="font-size:13px;font-weight:700;color:var(--red);letter-spacing:0.06em;">RECORDING</span>
+          <span class="duration" style="font-size:28px;" id="guestRecDuration" aria-live="polite">00:00:00</span>
+        </div>
+      </div>
+
+      <div class="card" id="observerBanner" style="display:none;margin-bottom:14px;border-color:rgba(120,120,255,0.25);background:rgba(120,120,255,0.06);">
+        <div style="font-size:15px;font-weight:700;color:#9999ff;margin-bottom:4px;">👁 You are an Observer</div>
         <p style="font-size:13px;color:var(--text2);">Your microphone is off. You can hear everyone and use the chat, but you will not be recorded.</p>
       </div>
 
-      <div class="waveform-section" style="margin-bottom:16px;">
-        <div class="wave-header">
-          <span class="wave-title">YOUR MIC LEVEL</span>
-          <span class="wave-hint">Red = clipping</span>
-        </div>
-        <canvas id="guestWaveCanvas" class="wave-canvas" height="120"></canvas>
+      <div class="waveform-section" style="margin-bottom:14px;">
+        <div class="wave-header"><span class="wave-title">Your Mic Level</span><span class="wave-hint" aria-hidden="true">Red = clipping</span></div>
+        <canvas id="guestWaveCanvas" class="wave-canvas" height="100" aria-hidden="true"></canvas>
       </div>
 
       <!-- Guest level controls -->
-      <div class="card" id="guestLevelCard" style="display:none;margin-bottom:16px;">
-        <div class="card-label" style="font-size:13px;margin-bottom:14px;">YOUR LEVELS <span style="font-size:11px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;">— double-click to reset</span></div>
-        <div class="knobs-row">
-          <div class="knob-group">
-            <div class="knob-label">Input Gain</div>
-            <canvas class="knob-canvas" id="guestInputKnob" width="72" height="72" title="Drag up/down · Double-click to reset"></canvas>
-            <div class="knob-input-wrap">
-              <input type="number" id="guestInputDb" class="knob-input" value="0" min="-20" max="20" step="0.5" style="width:42px;" />
-              <span class="knob-unit">dB</span>
-            </div>
-            <div class="knob-hint">Your mic level</div>
-          </div>
-          <div class="meter-center">
-            <div class="meter-wrap">
-              <div class="meter-bar" id="guestMeterBar"></div>
-              <div class="meter-peaks"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
-            </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:4px;">
-              <span style="color:var(--green);">● Safe –24 to –6</span>
-              <span style="color:var(--red);margin-left:8px;">● Clipping above –6</span>
-            </div>
-          </div>
-          <div class="knob-group">
-            <div class="knob-label">Monitor</div>
-            <canvas class="knob-canvas" id="guestMonitorKnob" width="72" height="72" title="Drag up/down · Double-click to reset"></canvas>
-            <div class="knob-input-wrap">
-              <input type="number" id="guestMonitorDb" class="knob-input" value="-60" min="-60" max="0" step="0.5" style="width:42px;" />
-              <span class="knob-unit">dB</span>
-            </div>
-            <div class="knob-hint">Headphone vol</div>
-          </div>
+      <div class="card" id="guestLevelCard" style="display:none;margin-bottom:14px;">
+        <div class="card-label" style="margin-bottom:14px;">Your Levels</div>
+        <div class="level-slider-row">
+          <label class="level-slider-label" for="guestInputSlider">Input Gain</label>
+          <input type="range" id="guestInputSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
+          <span class="level-slider-val" id="guestInputVal">0 dB</span>
         </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px;padding-left:90px;">How loud your mic is recorded</div>
+        <div class="meter-wrap" style="margin-bottom:4px;" role="meter" aria-label="Input level">
+          <div class="meter-bar" id="guestMeterBar"></div>
+          <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:14px;display:flex;gap:10px;">
+          <span style="color:var(--green);">● Safe –24 to –6 dB</span>
+          <span style="color:var(--red);">● Clipping above –6 dB</span>
+        </div>
+        <div class="level-slider-row">
+          <label class="level-slider-label" for="guestMonitorSlider">Monitor</label>
+          <input type="range" id="guestMonitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
+          <span class="level-slider-val" id="guestMonitorVal">Off</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);padding-left:90px;">Headphone volume — doesn't affect recording</div>
       </div>
 
-      <div class="card" id="guestRecordingCard" style="display:none;margin-bottom:16px;border-color:rgba(255,68,68,0.3);background:var(--red-dim);">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:16px;height:16px;border-radius:50%;background:var(--red);animation:blink 1s infinite;flex-shrink:0;"></div>
-          <div>
-            <div style="font-size:15px;font-weight:600;color:var(--red);">YOU ARE BEING RECORDED</div>
-            <div style="font-size:13px;color:var(--text2);margin-top:2px;" id="guestRecDuration">00:00:00</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" id="guestUploadCard" style="display:none;margin-bottom:16px;">
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;">Sending your track to the host…</div>
+      <div class="card" id="guestUploadCard" style="display:none;margin-bottom:14px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Sending your track to the host…</div>
         <div class="transfer-bar-wrap" style="margin-bottom:8px;"><div class="transfer-bar-fill" id="guestUploadBar"></div></div>
-        <div style="font-size:13px;color:var(--text2);" id="guestUploadPct">0%</div>
-        <p style="font-size:13px;color:#777;margin-top:10px;">⚠ Keep this page open until upload is complete.</p>
+        <div style="font-size:13px;color:var(--text2);" id="guestUploadPct" aria-live="polite">0%</div>
+        <p style="font-size:12px;color:var(--text3);margin-top:10px;">⚠ Keep this page open until upload is complete.</p>
+        <button class="btn btn-ghost btn-sm" id="guestFallbackBtn" style="margin-top:12px;display:none;">
+          ↓ Download my track instead
+        </button>
       </div>
 
-      <div class="card" id="guestDoneCard" style="display:none;margin-bottom:16px;border-color:rgba(68,255,136,0.3);">
-        <div style="font-size:15px;font-weight:600;color:var(--green);">✓ Your track has been sent to the host.</div>
-        <div style="font-size:13px;color:var(--text2);margin-top:6px;">You can now close this window. Thank you.</div>
+      <div class="card" id="guestDoneCard" style="display:none;margin-bottom:14px;border-color:rgba(0,229,107,0.25);">
+        <div style="font-size:15px;font-weight:700;color:var(--green);">✓ Your track has been sent to the host.</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:6px;">You can now close this window. Thank you for using Vox5000.</div>
       </div>
 
-      <!-- Guest leave button -->
-      <div style="margin-bottom:16px;">
-        <button class="btn btn-ghost" id="guestLeaveBtn" style="color:#FF4444;border-color:rgba(255,68,68,0.3);width:100%;justify-content:center;">
+      <div style="margin-bottom:14px;">
+        <button class="btn btn-ghost" id="guestLeaveBtn" style="color:var(--red);border-color:rgba(255,59,59,0.25);width:100%;justify-content:center;" aria-label="Leave the room">
           Leave Room
         </button>
       </div>
 
-      <div class="card chat-card">
-        <div class="card-label" style="font-size:13px;margin-bottom:14px;">CHAT</div>
-        <div class="chat-messages" id="guestChatMessages">
+      <div class="card chat-card" role="region" aria-label="Chat">
+        <div class="card-label">Chat</div>
+        <div class="chat-messages" id="guestChatMessages" aria-live="polite">
           <div class="chat-system">Chat is active. Use this if audio isn't working.</div>
         </div>
         <div class="chat-input-row">
-          <input type="text" id="guestChatInput" class="chat-input" placeholder="Type a message…" maxlength="300" />
+          <input type="text" id="guestChatInput" class="chat-input" placeholder="Type a message…" maxlength="300" aria-label="Chat message" />
           <button class="btn btn-record btn-sm" id="guestChatSend">Send</button>
         </div>
       </div>
     </main>
   </div>
 
-  <div id="audioElements" style="display:none;"></div>
+  <div id="audioElements" style="display:none;" aria-hidden="true"></div>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="room.js"></script>
 </body>

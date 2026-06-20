@@ -25,11 +25,7 @@ const dlSection     = $('dlSection');
 const dlGrid        = $('dlGrid');
 const waveCanvas    = $('waveCanvas');
 const permNotice    = $('permNotice');
-const inputGainDb   = $('inputGainDb');
-const monitorDb     = $('monitorDb');
 const clipWarn      = $('clipWarn');
-const inputKnobEl   = $('inputKnob');
-const monitorKnobEl = $('monitorKnob');
 const formatSelect  = $('formatSelect');
 const qualitySelect = $('qualitySelect');
 const m1=$('m1'), m2=$('m2'), m3=$('m3'), m4=$('m4');
@@ -55,7 +51,7 @@ let startTime, elapsed = 0, timerInterval;
 let markers = [];
 let clipTimeout;
 
-const wCtx = waveCanvas.getContext('2d');
+const wCtx = waveCanvas ? waveCanvas.getContext('2d') : null;
 let waveBuffer = [];
 const WAVE_HISTORY = 900;
 
@@ -68,21 +64,22 @@ const WAV_QUALITIES = {
 };
 const MP3_QUALITIES = {
   'mp3-320': { kbps: 320, label: 'MP3 320 kbps (High quality)' },
-  'mp3-192': { kbps: 192, label: 'MP3 192 kbps (Standard)' },
-  'mp3-128': { kbps: 128, label: 'MP3 128 kbps (Compressed)' },
-  'mp3-64':  { kbps: 64,  label: 'MP3 64 kbps (Small file / voice)' },
+  'mp3-256': { kbps: 256, label: 'MP3 256 kbps (Standard)' },
+  'mp3-192': { kbps: 192, label: 'MP3 192 kbps (Compressed)' },
+  'mp3-128': { kbps: 128, label: 'MP3 128 kbps (Small file)' },
 };
 
 function populateQualities() {
+  if (!qualitySelect) return;
   qualitySelect.innerHTML = '';
-  const map = formatSelect.value === 'mp3' ? MP3_QUALITIES : WAV_QUALITIES;
+  const map = formatSelect && formatSelect.value === 'wav' ? WAV_QUALITIES : MP3_QUALITIES;
   Object.entries(map).forEach(([key, val]) => {
     const opt = document.createElement('option');
     opt.value = key; opt.textContent = val.label;
     qualitySelect.appendChild(opt);
   });
 }
-formatSelect.addEventListener('change', populateQualities);
+if (formatSelect) formatSelect.addEventListener('change', populateQualities);
 populateQualities();
 
 function fmt(s) {
@@ -90,129 +87,45 @@ function fmt(s) {
   return [h,m,sec].map(v=>String(v).padStart(2,'0')).join(':');
 }
 
-function dbToGain(db) { return Math.pow(10, db / 20); }
+function dbToGain(db) { return db <= -59 ? 0 : Math.pow(10, db / 20); }
 
-// ── Knob drawing ──
-function drawKnob(canvas, db, minDb, maxDb) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  const cx = w/2, cy = h/2, r = cx - 8;
-  const startAngle = Math.PI * 0.75;
-  const endAngle = Math.PI * 2.25;
-  const norm = Math.max(0, Math.min(1, (db - minDb) / (maxDb - minDb)));
-  const angle = startAngle + norm * (endAngle - startAngle);
-  const color = '#E8FF47'; // both knobs yellow
+// ── Level sliders ──
+const inputGainSlider  = $('inputGainSlider');
+const inputGainVal     = $('inputGainVal');
+const monitorSlider    = $('monitorSlider');
+const monitorVal       = $('monitorVal');
 
-  ctx.clearRect(0, 0, w, h);
-
-  // Track background
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, startAngle, endAngle);
-  ctx.strokeStyle = '#2a2a2a';
-  ctx.lineWidth = 7;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // Filled arc
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, startAngle, angle);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 7;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // Inner circle
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - 12, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fill();
-  ctx.strokeStyle = '#2e2e2e';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Pointer
-  const px = cx + (r - 16) * Math.cos(angle);
-  const py = cy + (r - 16) * Math.sin(angle);
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(px, py);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // Centre dot
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
+function formatDb(db) {
+  if (db <= -59) return 'Off';
+  if (db === 0) return '0 dB';
+  return (db > 0 ? '+' : '') + parseFloat(db).toFixed(1) + ' dB';
 }
 
-function updateInputKnob() {
-  const db = parseFloat(inputGainDb.value) || 0;
-  drawKnob(inputKnobEl, db, -20, 20);
-  if (gainNode) gainNode.gain.value = dbToGain(db);
+if (inputGainSlider) {
+  inputGainSlider.addEventListener('input', () => {
+    const db = parseFloat(inputGainSlider.value);
+    if (inputGainVal) inputGainVal.textContent = formatDb(db);
+    if (gainNode) gainNode.gain.value = dbToGain(db);
+  });
+  inputGainSlider.addEventListener('dblclick', () => {
+    inputGainSlider.value = 0;
+    if (inputGainVal) inputGainVal.textContent = '0 dB';
+    if (gainNode) gainNode.gain.value = 1;
+  });
 }
 
-function updateMonitorKnob() {
-  const db = parseFloat(monitorDb.value) || -60;
-  drawKnob(monitorKnobEl, db, -60, 0);
-  if (monitorGainNode) monitorGainNode.gain.value = db <= -59 ? 0 : dbToGain(db);
+if (monitorSlider) {
+  monitorSlider.addEventListener('input', () => {
+    const db = parseFloat(monitorSlider.value);
+    if (monitorVal) monitorVal.textContent = formatDb(db);
+    if (monitorGainNode) monitorGainNode.gain.value = dbToGain(db);
+  });
+  monitorSlider.addEventListener('dblclick', () => {
+    monitorSlider.value = -60;
+    if (monitorVal) monitorVal.textContent = 'Off';
+    if (monitorGainNode) monitorGainNode.gain.value = 0;
+  });
 }
-
-// ── Knob drag ──
-function setupKnobDrag(canvas, input, minDb, maxDb, onUpdate, resetVal) {
-  let dragging = false, startY = 0, startVal = 0;
-  canvas.style.cursor = 'ns-resize';
-
-  canvas.addEventListener('mousedown', e => {
-    if (e.detail === 2) return; // ignore double-click
-    dragging = true; startY = e.clientY; startVal = parseFloat(input.value);
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const delta = (startY - e.clientY) * 0.3;
-    input.value = Math.max(minDb, Math.min(maxDb, startVal + delta)).toFixed(1);
-    onUpdate();
-  });
-  window.addEventListener('mouseup', () => { dragging = false; });
-
-  // Double-click knob to reset
-  canvas.addEventListener('dblclick', () => {
-    input.value = resetVal;
-    onUpdate();
-  });
-
-  // Double-click number input to reset
-  input.addEventListener('dblclick', () => {
-    input.value = resetVal;
-    onUpdate();
-  });
-
-  input.addEventListener('change', onUpdate);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') onUpdate(); });
-
-  // Touch
-  canvas.addEventListener('touchstart', e => {
-    if (e.touches.length > 1) return;
-    dragging = true; startY = e.touches[0].clientY; startVal = parseFloat(input.value);
-    e.preventDefault();
-  }, { passive: false });
-  window.addEventListener('touchmove', e => {
-    if (!dragging) return;
-    const delta = (startY - e.touches[0].clientY) * 0.3;
-    input.value = Math.max(minDb, Math.min(maxDb, startVal + delta)).toFixed(1);
-    onUpdate();
-  });
-  window.addEventListener('touchend', () => { dragging = false; });
-}
-
-setupKnobDrag(inputKnobEl,   inputGainDb, -20, 20, updateInputKnob,   '0');
-setupKnobDrag(monitorKnobEl, monitorDb,   -60,  0, updateMonitorKnob, '0');
-
-updateInputKnob();
-updateMonitorKnob();
 
 // ── Mic init ──
 async function initMics() {
@@ -266,10 +179,10 @@ async function startStream(deviceId) {
     }
     const src = audioCtx.createMediaStreamSource(stream);
     gainNode = audioCtx.createGain();
-    gainNode.gain.value = dbToGain(parseFloat(inputGainDb.value) || 0);
+    gainNode.gain.value = dbToGain(inputGainSlider ? parseFloat(inputGainSlider.value) : 0);
     monitorGainNode = audioCtx.createGain();
-    const monDb = parseFloat(monitorDb.value) || -60;
-    monitorGainNode.gain.value = monDb <= -59 ? 0 : dbToGain(monDb);
+    const monDb = monitorSlider ? parseFloat(monitorSlider.value) : -60;
+    monitorGainNode.gain.value = dbToGain(monDb);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 1024;
     monitorDest = audioCtx.createMediaStreamDestination();

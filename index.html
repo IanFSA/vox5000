@@ -153,42 +153,33 @@
           <span class="advanced-toggle-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="advanced-section" id="advancedSection" aria-hidden="true">
-          <!-- Knobs -->
+          <!-- Sliders -->
           <div>
-            <div class="card-label" style="margin-bottom:14px;">Levels <span class="card-label-hint">— double-click knob or value to reset to 0</span></div>
-            <div class="knobs-row">
-              <div class="knob-group">
-                <div class="knob-label">Input Gain</div>
-                <canvas class="knob-canvas" id="inputKnob" width="80" height="80" title="Drag up/down · Double-click to reset" aria-label="Input gain knob"></canvas>
-                <div class="knob-input-wrap">
-                  <input type="number" id="inputGainDb" class="knob-input" value="0" min="-20" max="20" step="0.5" aria-label="Input gain in dB" />
-                  <span class="knob-unit">dB</span>
-                </div>
-                <div class="knob-hint">How loud your mic is recorded</div>
-              </div>
-              <div class="meter-center">
-                <div class="meter-wrap" role="meter" aria-label="Input level meter">
-                  <div class="meter-bar" id="meterBar"></div>
-                  <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
-                </div>
-                <div style="font-size:10px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;" aria-label="Level guidance">
-                  <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
-                  <span style="color:var(--red);">● Clipping: above –6 dB</span>
-                </div>
-                <div class="clip-warn" id="clipWarn" style="display:none;" role="alert" aria-live="assertive">
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2L13 12H1L7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.5" r="0.75" fill="currentColor"/></svg>
-                  Clipping — reduce input gain
-                </div>
-              </div>
-              <div class="knob-group">
-                <div class="knob-label">Monitor</div>
-                <canvas class="knob-canvas" id="monitorKnob" width="80" height="80" title="Drag up/down · Double-click to reset" aria-label="Monitor level knob"></canvas>
-                <div class="knob-input-wrap">
-                  <input type="number" id="monitorDb" class="knob-input" value="-60" min="-60" max="0" step="0.5" aria-label="Monitor level in dB" />
-                  <span class="knob-unit">dB</span>
-                </div>
-                <div class="knob-hint">Headphone volume — doesn't affect recording</div>
-              </div>
+            <div class="card-label" style="margin-bottom:14px;">Levels</div>
+            <div class="level-slider-row">
+              <label class="level-slider-label" for="inputGainSlider">Input Gain</label>
+              <input type="range" id="inputGainSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
+              <span class="level-slider-val" id="inputGainVal">0 dB</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">How loud your mic is recorded · Double-click to reset</div>
+            <div class="level-slider-row">
+              <label class="level-slider-label" for="monitorSlider">Monitor</label>
+              <input type="range" id="monitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
+              <span class="level-slider-val" id="monitorVal">Off</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">What you hear in headphones — doesn't affect recording</div>
+
+            <div class="meter-wrap" role="meter" aria-label="Input level meter">
+              <div class="meter-bar" id="meterBar"></div>
+              <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+            </div>
+            <div style="font-size:10px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;">
+              <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
+              <span style="color:var(--red);">● Clipping: above –6 dB</span>
+            </div>
+            <div class="clip-warn" id="clipWarn" style="display:none;margin-top:10px;" role="alert" aria-live="assertive">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2L13 12H1L7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.5" r="0.75" fill="currentColor"/></svg>
+              Clipping — reduce input gain
             </div>
           </div>
           <!-- Waveform -->
