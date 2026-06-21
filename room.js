@@ -1500,7 +1500,8 @@ function setupGuestControls() {
       const a = document.createElement('a');
       const safe = myName.replace(/[^a-zA-Z0-9]/g, '_');
       const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-      a.href = url; a.download = `${safe}_backup_${ts}.webm`; a.click();
+      const ext = (guestBackupBlob && guestBackupBlob.type.includes('mp3')) ? 'mp3' : 'webm';
+      a.href = url; a.download = `${safe}_backup_${ts}.${ext}`; a.click();
       URL.revokeObjectURL(url);
     });
   }
@@ -1620,25 +1621,72 @@ function startGuestRecording() {
 function stopGuestRecording(hostConn) {
   const oa = $('onAir'); if (oa) oa.classList.remove('visible');
   if ($('guestTimerCard')) $('guestTimerCard').style.display = 'none';
-  setText($('guestStatusDisplay'), 'Preparing your track…');
+  setText($('guestStatusDisplay'), 'Encoding and preparing your track…');
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-    sendRawToHost(hostConn); return;
+    encodeAndSendToHost(hostConn); return;
   }
-  mediaRecorder.onstop = () => sendRawToHost(hostConn);
+  mediaRecorder.onstop = () => encodeAndSendToHost(hostConn);
   mediaRecorder.stop();
 }
 
-// P7: Send raw WebM — no MP3 encoding required for transfer
-function sendRawToHost(hostConn) {
+// Encode to MP3 then send — falls back to raw WebM if encoding fails
+async function encodeAndSendToHost(hostConn) {
   if (!rawChunks || rawChunks.length === 0) {
     showGuestTransferFailed('No audio was recorded. Check your microphone was working.');
     return;
   }
-  const rawBlob = new Blob(rawChunks, { type: 'audio/webm' });
-  guestBackupBlob = rawBlob;
   if ($('guestUploadCard')) $('guestUploadCard').style.display = 'block';
-  setText($('guestUploadPct'), 'Sending audio…');
-  sendFileToHost(hostConn, rawBlob, 'audio/webm');
+  setText($('guestUploadPct'), 'Encoding to MP3…');
+
+  const rawBlob = new Blob(rawChunks, { type: 'audio/webm' });
+  guestBackupBlob = rawBlob; // always store raw as backup
+
+  try {
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
+    const mp3Blob = await encodeMp3Room(decoded, 256);
+    if (!mp3Blob || mp3Blob.size === 0) throw new Error('Empty MP3');
+    guestBackupBlob = mp3Blob; // upgrade backup to MP3
+    setText($('guestUploadPct'), 'Sending…');
+    sendFileToHost(hostConn, mp3Blob, 'audio/mp3');
+  } catch(err) {
+    console.warn('MP3 encode failed, sending raw WebM:', err);
+    setText($('guestUploadPct'), 'Sending raw audio…');
+    sendFileToHost(hostConn, rawBlob, 'audio/webm');
+  }
+}
+
+// MP3 encoder for room — loads lamejs from CDN
+function encodeMp3Room(audioBuffer, kbps) {
+  return new Promise((resolve, reject) => {
+    function doEncode() {
+      try {
+        const samples = audioBuffer.getChannelData(0);
+        const sr = audioBuffer.sampleRate;
+        const mp3enc = new lamejs.Mp3Encoder(1, sr, kbps);
+        const blockSize = 1152, mp3Data = [];
+        const int16 = new Int16Array(samples.length);
+        for (let i = 0; i < samples.length; i++) {
+          const s = Math.max(-1, Math.min(1, samples[i]));
+          int16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7FFF);
+        }
+        for (let i = 0; i < int16.length; i += blockSize) {
+          const enc = mp3enc.encodeBuffer(int16.subarray(i, i + blockSize));
+          if (enc.length > 0) mp3Data.push(new Uint8Array(enc));
+        }
+        const flushed = mp3enc.flush();
+        if (flushed.length > 0) mp3Data.push(new Uint8Array(flushed));
+        if (mp3Data.length === 0) { reject(new Error('No MP3 data')); return; }
+        resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
+      } catch(e) { reject(e); }
+    }
+    if (window.lamejs) { doEncode(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+    script.onload = doEncode;
+    script.onerror = () => reject(new Error('Failed to load MP3 encoder'));
+    document.head.appendChild(script);
+  });
 }
 
 function sendFileToHost(hostConn, blob, mimeType) {
@@ -1786,12 +1834,32 @@ async function finaliseGuestTrack(peerId, conn) {
 
 async function buildHostDownload() {
   if (!rawChunks || rawChunks.length === 0) return;
-  const blob = new Blob(rawChunks, { type: 'audio/webm' });
+  const rawBlob = new Blob(rawChunks, { type: 'audio/webm' });
   const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
   const safe = (myName || 'Host').replace(/[^a-zA-Z0-9]/g, '_');
-  const sizeMb = (blob.size / 1048576).toFixed(1);
-  // P4: Honest label — WebM Opus, not WAV
-  addDownloadItem(`${safe}_HOST_${ts}.webm`, `${myName} (Host) · WebM Opus · ${sizeMb} MB`, URL.createObjectURL(blob), `${safe}_HOST_${ts}.webm`);
+
+  try {
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
+    const mp3Blob = await encodeMp3Room(decoded, 256);
+    const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
+    addDownloadItem(
+      `${safe}_HOST_${ts}.mp3`,
+      `${myName} (Host) · MP3 256kbps · ${sizeMb} MB`,
+      URL.createObjectURL(mp3Blob),
+      `${safe}_HOST_${ts}.mp3`
+    );
+  } catch(e) {
+    // Fallback to raw WebM if MP3 encoding fails
+    console.warn('Host MP3 encode failed, offering WebM:', e);
+    const sizeMb = (rawBlob.size / 1048576).toFixed(1);
+    addDownloadItem(
+      `${safe}_HOST_${ts}.webm`,
+      `${myName} (Host) · WebM Opus (fallback) · ${sizeMb} MB`,
+      URL.createObjectURL(rawBlob),
+      `${safe}_HOST_${ts}.webm`
+    );
+  }
   if ($('dlSection')) $('dlSection').style.display = 'block';
 }
 
