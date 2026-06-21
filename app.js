@@ -378,17 +378,26 @@ function stopRecording() {
   if (!recording) return;
   recording = false; paused = false;
   clearInterval(timerInterval);
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
+
+  function resetUI() {
+    onAir.classList.remove('visible');
+    recBtn.classList.remove('recording');
+    recBtn.innerHTML = '<span class="rec-dot"></span> Record';
+    recBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.innerHTML = '⏸ Pause';
+    durStatus.textContent = 'Processing…';
+    sizeDisplay.textContent = '';
   }
-  onAir.classList.remove('visible');
-  recBtn.classList.remove('recording');
-  recBtn.innerHTML = '<span class="rec-dot"></span> Record';
-  recBtn.disabled = false;
-  pauseBtn.disabled = true;
-  pauseBtn.innerHTML = '⏸ Pause';
-  durStatus.textContent = 'Processing…';
-  sizeDisplay.textContent = '';
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    const prev = mediaRecorder.onstop;
+    mediaRecorder.onstop = () => { resetUI(); if (prev) prev(); };
+    mediaRecorder.stop();
+  } else {
+    resetUI();
+    finalise();
+  }
 }
 
 function tick() {
