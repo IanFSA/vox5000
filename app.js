@@ -19,7 +19,6 @@ const pauseBtn      = $('pauseBtn');
 const onAir         = $('onAir');
 const duration      = $('duration');
 const durStatus     = $('durStatus');
-const markerLog     = $('markerLog');
 const sizeDisplay   = $('sizeDisplay');
 const dlSection     = $('dlSection');
 const dlGrid        = $('dlGrid');
@@ -28,7 +27,6 @@ const permNotice    = $('permNotice');
 const clipWarn      = $('clipWarn');
 const formatSelect  = $('formatSelect');
 const qualitySelect = $('qualitySelect');
-const m1=$('m1'), m2=$('m2'), m3=$('m3'), m4=$('m4');
 
 // Solo mode toggle — init mics when user opens recorder
 let micsInitialised = false;
@@ -48,7 +46,6 @@ let gainNode, monitorGainNode, monitorDest;
 let mediaRecorder, chunks = [];
 let recording = false, paused = false, testing = false;
 let startTime, elapsed = 0, timerInterval;
-let markers = [];
 let clipTimeout;
 
 const wCtx = waveCanvas ? waveCanvas.getContext('2d') : null;
@@ -83,6 +80,11 @@ if (formatSelect) formatSelect.addEventListener('change', populateQualities);
 populateQualities();
 
 function fmt(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+  const ms = Math.floor((s % 1) * 10);
+  return [h,m,sec].map(v=>String(v).padStart(2,'0')).join(':') + '.' + ms;
+}
+function fmtNoMs(s) {
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
   return [h,m,sec].map(v=>String(v).padStart(2,'0')).join(':');
 }
@@ -335,13 +337,19 @@ testBtn.addEventListener('click', async () => {
 
 // ── Record / Stop ──
 recBtn.addEventListener('click', async () => {
+  if (recBtn.disabled) return;
   if (!stream) { await initMics(); return; }
-  recording ? stopRecording() : startRecording();
+  if (recording) {
+    recBtn.disabled = true;
+    stopRecording();
+  } else {
+    startRecording();
+  }
 });
 
 function startRecording() {
-  chunks = []; markers = [];
-  markerLog.textContent = ''; sizeDisplay.textContent = '';
+  chunks = [];
+  sizeDisplay.textContent = '';
   dlSection.classList.remove('visible');
   dlGrid.innerHTML = '';
   waveBuffer = [];
@@ -358,25 +366,27 @@ function startRecording() {
 
   recording = true; paused = false; elapsed = 0;
   startTime = Date.now();
-  timerInterval = setInterval(tick, 500);
+  timerInterval = setInterval(tick, 100);
   recBtn.classList.add('recording');
   recBtn.innerHTML = '<span class="rec-dot"></span> Stop';
   pauseBtn.disabled = false;
-  [m1,m2,m3,m4].forEach(b => b.disabled = false);
   onAir.classList.add('visible');
   durStatus.textContent = 'Recording';
 }
 
 function stopRecording() {
-  mediaRecorder.stop();
+  if (!recording) return;
   recording = false; paused = false;
   clearInterval(timerInterval);
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
   onAir.classList.remove('visible');
   recBtn.classList.remove('recording');
   recBtn.innerHTML = '<span class="rec-dot"></span> Record';
+  recBtn.disabled = false;
   pauseBtn.disabled = true;
-  pauseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="3.5" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="2" width="3.5" height="10" rx="1" fill="currentColor"/></svg> Pause';
-  [m1,m2,m3,m4].forEach(b => b.disabled = true);
+  pauseBtn.innerHTML = '⏸ Pause';
   durStatus.textContent = 'Processing…';
   sizeDisplay.textContent = '';
 }
@@ -386,7 +396,7 @@ function tick() {
     elapsed = (Date.now() - startTime) / 1000;
     duration.textContent = fmt(elapsed);
     const mb = (chunks.reduce((a,c)=>a+c.size,0)/1048576).toFixed(1);
-    sizeDisplay.textContent = mb + ' MB captured';
+    if (parseFloat(mb) > 0) sizeDisplay.textContent = mb + ' MB captured';
   }
 }
 
@@ -406,17 +416,7 @@ pauseBtn.addEventListener('click', () => {
   }
 });
 
-const markerLabels = { m1:'Intro', m2:'Break', m3:'Outro', m4:'Clip' };
-[m1,m2,m3,m4].forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (!recording || paused) return;
-    const t = fmt(Math.floor(elapsed));
-    markers.push({ label: markerLabels[btn.id], time: t });
-    markerLog.innerHTML = markers.map(mk =>
-      `<span style="color:#888">${mk.label}</span> @ <span style="color:#E8FF47">${mk.time}</span>`
-    ).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
-  });
-});
+
 
 // ── WAV encoder ──
 function writeWavHeader(numSamples, sr, numCh, bitDepth) {
@@ -487,7 +487,7 @@ async function finalise() {
   const webmBlob = new Blob(chunks, { type: 'audio/webm' });
   const fmtVal = formatSelect.value, quality = qualitySelect.value;
   const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-  const dur = fmt(Math.floor(elapsed));
+  const dur = fmtNoMs(Math.floor(elapsed));
   dlGrid.innerHTML = '';
   let audioBuffer;
   try {
@@ -508,14 +508,8 @@ async function finalise() {
     addDownload(`Vox5000_${ts}.wav`, `WAV · ${bits}-bit · ${Math.round(audioBuffer.sampleRate/1000)} kHz · ${dur} · ${(wavBlob.size/1048576).toFixed(1)} MB`, url, `Vox5000_${ts}.wav`);
   }
 
-  if (markers.length > 0) {
-    const txt = `Vox5000 Marker Log\nSession: ${ts}\nDuration: ${dur}\n\n` + markers.map(mk=>`${mk.label}\t${mk.time}`).join('\n');
-    const mUrl = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
-    addDownload(`Vox5000_${ts}_markers.txt`, `${markers.length} marker${markers.length>1?'s':''} · ${dur}`, mUrl, `Vox5000_${ts}_markers.txt`);
-  }
-
   elapsed = 0;
-  duration.textContent = '00:00:00';
+  duration.textContent = '00:00:00.0';
   durStatus.textContent = 'Done — download your files below';
   dlSection.classList.add('visible');
   dlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -533,4 +527,4 @@ function addDownload(name, meta, url, filename) {
   `);
 }
 
-initMics();
+// Mic initialisation is triggered by the MutationObserver when soloRecorder becomes visible
