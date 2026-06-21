@@ -134,9 +134,9 @@
 
 /* Room main layout */
 .room-main {
-  max-width: 1160px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 24px 80px;
+  padding: 24px 40px 80px;
 }
 
 /* Top bar */

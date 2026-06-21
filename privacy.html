@@ -10,7 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .prose{max-width:680px;margin:0 auto;padding:40px 20px 80px;}
+    .prose{max-width:800px;margin:0 auto;padding:40px 40px 80px;}
+    @media(max-width:600px){.prose{padding:24px 16px 80px;}}
+    @media(max-width:1023px) and (min-width:601px){.prose{padding:40px 24px 80px;}}
     .prose h2{font-size:18px;font-weight:600;color:var(--text);margin:2rem 0 0.75rem;letter-spacing:-0.02em;}
     .prose h2:first-of-type{margin-top:0;}
     .prose p{font-size:15px;color:#bbb;line-height:1.7;margin-bottom:1rem;}
