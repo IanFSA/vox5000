@@ -71,8 +71,7 @@
       <li>Participant name (as entered by the participant)</li>
       <li>Whether they consented to recording or joined as an Observer</li>
       <li>Date and time of joining</li>
-      <li>IP address (fetched from a public API)</li>
-      <li>Browser user agent, platform, language and screen resolution</li>
+      <li>Browser user agent</li>
     </ul>
     <p>This data is <strong>not sent to Vox5000's servers</strong>. It is stored only in the host's browser session and is downloaded by the host as a local text file when the session ends. The host is responsible for retaining and protecting this consent record in accordance with applicable data protection laws.</p>
     <p>Vox5000 does not receive, store, or have access to consent logs.</p>
@@ -87,7 +86,7 @@
     <p>Vox5000 may display advertisements served by Google AdSense. Google uses cookies to serve ads based on your prior visits to our site and other sites. You can opt out at <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google's ad settings</a>. Google's use of advertising cookies is governed by <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</p>
 
     <h2>Third-party services</h2>
-    <p>Vox5000 loads fonts from Google Fonts and uses PeerJS (via unpkg.com CDN) for WebRTC signalling in interview rooms. These services may log your IP address as a standard part of serving files. The PeerJS signalling server facilitates the initial connection between participants but does not receive or store any audio.</p>
+    <p>Vox5000 loads fonts from Google Fonts, PeerJS from unpkg.com for WebRTC signalling, and lamejs from cdnjs for optional MP3 export. Interview rooms may also use a TURN relay provider if configured, to help participants connect on restrictive networks. These services may log your IP address as a standard part of serving files or relaying encrypted WebRTC traffic. PeerJS and TURN services facilitate connection setup or relay transport but do not store your recordings.</p>
 
     <h2>Your rights under POPIA</h2>
     <p>As a South African operator, we are subject to the Protection of Personal Information Act, 2013 (POPIA). Because Vox5000 does not store personal information beyond standard server logs, there is in practice very little personal information for us to hold. If you believe we hold personal information about you and wish to request access, correction, or deletion, contact us at the address below.</p>

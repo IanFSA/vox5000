@@ -97,6 +97,17 @@ body {
 .nav-cta:hover { background: #cbeb00; }
 .nav-cta:active { transform: scale(0.97); }
 
+/* Compact header for phones and narrow browser windows */
+@media (max-width: 700px) {
+  .header-inner {
+    padding: 0 16px;
+    gap: 10px;
+  }
+  .logo-img { height: 22px; }
+  .main-nav { display: none; }
+  .nav-cta { display: none; }
+}
+
 /* ── ON AIR badge ── */
 .on-air {
   display: none;
@@ -678,7 +689,6 @@ body {
   .knob-group { min-width: 76px; }
   .knob-canvas { width: 68px !important; height: 68px !important; }
   .card { padding: 18px; }
-  .nav-cta { display: none; }
 }
 
 /* ── Tablet ── */

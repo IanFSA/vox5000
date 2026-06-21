@@ -4,9 +4,9 @@
 //  VOX5000 — Interview Room
 //  Handles both host and guest sides of a WebRTC session.
 //
-//  P1: Host detection uses localStorage owner token OR ?host=1 flag.
-//      Guest links never include host=1.
-//  P2: ICE servers configured with STUN. TURN placeholder included.
+//  P1: Host detection uses local room ownership only. Guest links cannot
+//      become host links by adding a public query parameter.
+//  P2: ICE servers configured with STUN plus an optional TURN hook.
 //  P3: Mic → gainNode → processedDest → MediaRecorder (gain affects recording).
 //  P5: All user content uses textContent or esc() — never innerHTML.
 //  P6: Consent log uses only name, role, consent status, timestamp, user agent.
@@ -28,17 +28,25 @@ const $ = id => document.getElementById(id);
 // ── URL params ──
 const params  = new URLSearchParams(window.location.search);
 const urlCode = params.get('r');  // room code from URL
-const urlHost = params.get('host') === '1'; // explicit host flag from My Rooms
 
 // ── P1: Determine host status ──
-// Host if: no room code (fresh creation) OR ?host=1 flag OR localStorage owner token matches
+// Host if: no room code (fresh creation) OR this browser locally owns the room.
 function checkIsHost() {
   if (!urlCode) return true; // no room code = creating new room
-  if (urlHost) return true;  // My Rooms uses ?host=1
-  // Owner token: when host creates a room, we store a token in localStorage
   try {
+    // v23: Ownership is local-only. A copied URL must not grant host mode.
     const owned = JSON.parse(localStorage.getItem('vox5000_owned') || '{}');
     if (owned[urlCode]) return true;
+
+    // Backward-compatible migration for older saved rooms that predate
+    // vox5000_owned. If the room exists in this browser's My Rooms list,
+    // this browser is allowed to reopen it as host and is marked as owner.
+    const rooms = JSON.parse(localStorage.getItem('vox5000_rooms') || '{}');
+    if (rooms[urlCode]) {
+      owned[urlCode] = Date.now();
+      localStorage.setItem('vox5000_owned', JSON.stringify(owned));
+      return true;
+    }
   } catch(e) {}
   return false; // default: guest
 }
@@ -49,9 +57,10 @@ let roomId   = urlCode || null;
 // ── P2: ICE / STUN / TURN config ──
 // STUN is included. For TURN: deploy a small serverless function that returns
 // temporary credentials from a TURN provider (Metered, Twilio, etc.).
-// Set TURN_CREDENTIALS_URL to that endpoint. Leave empty to skip TURN.
+// Set window.VOX5000_TURN_CREDENTIALS_URL before room.js loads to override this
+// Vercel endpoint. The endpoint returns [] until TURN env vars are configured.
 // Without TURN, some users behind strict corporate firewalls may fail to connect.
-const TURN_CREDENTIALS_URL = ''; // e.g. '/api/turn-credentials'
+const TURN_CREDENTIALS_URL = window.VOX5000_TURN_CREDENTIALS_URL || '/api/turn-credentials';
 
 async function getIceServers() {
   const base = [
@@ -61,8 +70,10 @@ async function getIceServers() {
   if (!TURN_CREDENTIALS_URL) return base;
   try {
     const r = await fetch(TURN_CREDENTIALS_URL, { cache: 'no-store' });
+    if (!r.ok && r.status !== 204) throw new Error(`TURN endpoint returned ${r.status}`);
+    if (r.status === 204) return base;
     const creds = await r.json();
-    return [...base, ...creds]; // merge STUN + TURN
+    return [...base, ...(Array.isArray(creds) ? creds : [])]; // merge STUN + TURN
   } catch(e) {
     console.warn('Could not fetch TURN credentials, falling back to STUN only:', e);
     return base;
@@ -219,7 +230,7 @@ async function enterRoom() {
     saveRoom(roomId, { name: roomName, created: Date.now() });
     markAsOwner(roomId); // P1: mark this browser as owner
     saveHostSession({ roomId, name: myName });
-    window.history.replaceState({}, '', `?r=${encodeURIComponent(roomId)}&host=1`);
+    window.history.replaceState({}, '', `?r=${encodeURIComponent(roomId)}`);
 
     consentLog.push(buildParticipantLogEntry(myName, 'Host', true, false));
     showLoadingThenHostRoom();

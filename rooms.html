@@ -123,10 +123,11 @@
         const right = document.createElement('div');
         right.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
 
-        // ── P1 FIX: Open room uses ?host=1 flag so room.js recognises this browser as host ──
-        // Guest invite links use ?r=CODE only — no host flag — so guests never get host mode
+        // Host reopening is based on this browser's saved local room ownership.
+        // Guest invite links use the same URL shape, but guests do not have the
+        // local owner record, so they enter guest mode.
         const openBtn = document.createElement('a');
-        openBtn.href = `room.html?r=${encodeURIComponent(id)}&host=1`;
+        openBtn.href = `room.html?r=${encodeURIComponent(id)}`;
         openBtn.className = 'btn btn-record btn-sm';
         openBtn.style.textDecoration = 'none';
         openBtn.textContent = 'Open as host';
@@ -162,7 +163,7 @@
       }
     }
 
-    // Guest invite link — no &host=1 flag, so opens in guest mode
+    // Guest invite link — opens as guest unless this same browser owns the room
     function copyGuestLink(id) {
       const url = `${location.origin}/room.html?r=${encodeURIComponent(id)}`;
       navigator.clipboard.writeText(url).then(() => {

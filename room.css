@@ -201,6 +201,7 @@
 .participant-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -425,6 +426,23 @@
 .nav-active { color: var(--yellow) !important; }
 .nav-cta { font-size: 13px; font-weight: 600; color: #000; background: var(--yellow); text-decoration: none; padding: 7px 16px; border-radius: var(--radius-sm); transition: background 0.15s; white-space: nowrap; }
 .nav-cta:hover { background: #cbeb00; }
+
+@media (max-width: 700px) {
+  .main-nav { display: none; }
+  .room-header-actions {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .room-header-actions .on-air {
+    padding: 5px 9px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  #settingsBtn {
+    width: 34px !important;
+    height: 34px !important;
+  }
+}
 
 /* Room name input on headphone screen */
 .room-name-input-section { margin-bottom: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }

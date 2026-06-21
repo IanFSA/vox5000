@@ -21,7 +21,7 @@
         <a href="rooms.html" class="nav-link">My Rooms</a>
         <a href="help.html" class="nav-link">Help</a>
       </nav>
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="room-header-actions" style="display:flex;align-items:center;gap:10px;">
         <div class="on-air" id="onAir" aria-live="assertive"><span class="on-air-dot" aria-hidden="true"></span><span>ON AIR</span></div>
         <button id="settingsBtn" title="Audio Settings" aria-label="Audio Settings" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:36px;height:36px;border-radius:var(--radius-sm);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">⚙</button>
       </div>
@@ -161,6 +161,7 @@
       <div class="screen-step">Step 3 of 3</div>
       <h1 class="screen-title">Will you be recorded?</h1>
       <p class="screen-sub">This session is being recorded. Choose how you want to participate.</p>
+      <p class="consent-text" style="margin-bottom:14px;">Your name, choice, time of joining and browser user agent are included in the host's local consent log.</p>
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
         <button id="consentBtnYes" onclick="chooseConsent(true)" style="text-align:left;padding:20px;border-radius:10px;background:rgba(0,229,107,0.08);border:2px solid rgba(0,229,107,0.2);cursor:pointer;font-family:var(--font);transition:all 0.15s;width:100%;">
           <div style="display:flex;align-items:center;gap:14px;">
