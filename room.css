@@ -439,8 +439,8 @@
     letter-spacing: 0.06em;
   }
   #settingsBtn {
-    width: 34px !important;
-    height: 34px !important;
+    padding: 7px 9px;
+    font-size: 11px;
   }
 }
 
@@ -528,19 +528,29 @@
 
 /* ── Audio Settings Panel ── */
 .btn-settings {
-  background: var(--bg3);
-  border: 1px solid var(--border-strong);
-  color: var(--text2);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--yellow);
+  border: 1px solid var(--yellow);
+  color: #000;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font);
-  transition: all 0.15s;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
   white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(223,255,0,0.12);
 }
-.btn-settings:hover { color: var(--yellow); border-color: var(--yellow-border); }
+.btn-settings:hover {
+  background: #cbeb00;
+  box-shadow: 0 0 0 4px rgba(223,255,0,0.18);
+}
+.btn-settings:active { transform: scale(0.97); }
 
 .settings-panel {
   position: fixed;

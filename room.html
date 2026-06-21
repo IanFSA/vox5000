@@ -23,7 +23,10 @@
       </nav>
       <div class="room-header-actions" style="display:flex;align-items:center;gap:10px;">
         <div class="on-air" id="onAir" aria-live="assertive"><span class="on-air-dot" aria-hidden="true"></span><span>ON AIR</span></div>
-        <button id="settingsBtn" title="Audio Settings" aria-label="Audio Settings" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:36px;height:36px;border-radius:var(--radius-sm);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">⚙</button>
+        <button id="settingsBtn" class="btn-settings" title="Open audio settings" aria-label="Open audio settings">
+          <span aria-hidden="true">⚙</span>
+          <span>Audio Settings</span>
+        </button>
       </div>
     </div>
   </header>
@@ -248,7 +251,7 @@
         </button>
         <button class="share-btn" id="shareCopyLink" style="background:var(--bg3);border:1px solid var(--border-strong);grid-column:1/-1;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          <span id="copyLinkText">Copy link</span>
+          <span id="copyLinkText">Copy full invite</span>
         </button>
       </div>
     </div>

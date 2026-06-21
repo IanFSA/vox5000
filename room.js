@@ -1435,26 +1435,123 @@ function setupHostControls() {
 }
 
 // ── Share panel ──
+function buildGuestInviteMessage(url) {
+  return `Hi, you're being invited to record on VOX5000.
+
+Please read this before joining the recording room so we get the best possible sound.
+
+Room link:
+${url}
+
+BEST BROWSER
+Please open the link in Google Chrome.
+
+VOX5000 works best when everyone opens the room link in Chrome, whether you are using a computer, Android phone, or iPhone.
+
+IF YOU ARE USING A COMPUTER
+- Use Google Chrome on your laptop or desktop
+- Close any apps you do not need
+- Plug in your microphone or headset if you have one
+- Choose a quiet room
+- Keep your computer awake during the session
+- Allow microphone access when Chrome asks
+
+IF YOU ARE USING AN ANDROID PHONE
+- Use Google Chrome
+- Keep your phone charged
+- Use Wi-Fi or strong mobile data
+- Turn off battery saver if possible
+- Keep Chrome open during the session
+- Allow microphone access when Chrome asks
+
+IF YOU ARE USING AN IPHONE
+- Use Google Chrome on your iPhone
+- Open the room link in Chrome
+- Keep your phone charged
+- Use Wi-Fi or strong mobile data
+- Keep Chrome open during the session
+- Do not lock the phone while recording
+- Allow microphone access when Chrome asks
+
+HEADPHONES OR SPEAKERS
+Headphones or earphones are recommended because they reduce echo and feedback.
+
+Wired headphones are best. Bluetooth can work, but may sometimes add delay or reduce sound quality.
+
+If you do not have headphones, you can still join. Please keep your speaker volume low, stay in a quiet room, and avoid placing the device too close to another speaker.
+
+MICROPHONE
+Use the best microphone you have. A USB mic, headset mic, earphones mic, or your device's built-in mic can all work.
+
+For best results:
+- Sit close to the microphone
+- Keep a steady distance from it
+- Avoid tapping the desk or phone
+- Close windows and doors
+- Switch off fans, TV, music, or noisy appliances if possible
+
+BEFORE WE START
+- Open the room link in Google Chrome
+- Enter your name
+- Allow microphone access when Chrome asks
+- Choose "Yes — record me" if you agree to be recorded
+
+AUDIO SETTINGS
+At the top right of the room, click Audio Settings.
+
+There you can:
+- Choose the correct microphone
+- Test your mic for 5 seconds
+- Adjust your input level
+- Choose your speaker or headphone output
+- Turn noise suppression or echo cancellation on or off if needed
+
+If you are using headphones, echo cancellation is usually best left off for cleaner voice quality.
+
+If you are using speakers, echo cancellation may help reduce echo.
+
+DURING RECORDING
+- Keep Chrome open
+- Do not close the tab
+- Do not lock your phone or computer
+- Stay connected to stable Wi-Fi or mobile data
+- Wait for the host to stop the recording
+
+AFTER RECORDING
+When we stop, VOX5000 sends your local recording track to the host.
+
+Please wait until the screen confirms the track has been received.
+
+If transfer fails, use the backup download button and send the backup file manually.
+
+PRIVACY
+Your audio is recorded in your browser.
+
+VOX5000 does not store your recording on its servers.
+
+In interview rooms, your track is transferred to the host so they can download it.`;
+}
+
 function openSharePanel(url) {
   const panel = $('sharePanel');
   if (!panel) return;
   setText($('shareLinkDisplay'), url);
   panel.style.display = 'flex';
-  const msg = `You've been invited to join a Vox5000 interview room.\n\nOpen this link in Google Chrome:\n${url}`;
+  const msg = buildGuestInviteMessage(url);
   const wa = $('shareWhatsApp'); if (wa) wa.onclick = () => window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-  const tg = $('shareTelegram'); if (tg) tg.onclick = () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("You've been invited to a Vox5000 interview room.")}`, '_blank');
+  const tg = $('shareTelegram'); if (tg) tg.onclick = () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(msg)}`, '_blank');
   const em = $('shareEmail'); if (em) em.onclick = () => window.open(`mailto:?subject=Vox5000 Interview Invite&body=${encodeURIComponent(msg)}`);
   const sms = $('shareSMS'); if (sms) sms.onclick = () => window.open(`sms:?body=${encodeURIComponent(msg)}`);
   const nat = $('shareNative');
   if (nat) {
-    if (navigator.share) { nat.style.display = 'flex'; nat.onclick = () => navigator.share({ title: 'Vox5000 Interview Room', text: msg, url }).catch(() => {}); }
+    if (navigator.share) { nat.style.display = 'flex'; nat.onclick = () => navigator.share({ title: 'Vox5000 Interview Room', text: msg }).catch(() => {}); }
     else nat.style.display = 'none';
   }
   const copyLink = $('shareCopyLink');
   if (copyLink) copyLink.onclick = () => {
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(msg).then(() => {
       setText($('copyLinkText'), '✓ Copied!');
-      setTimeout(() => setText($('copyLinkText'), 'Copy link'), 2000);
+      setTimeout(() => setText($('copyLinkText'), 'Copy full invite'), 2000);
     });
   };
   const closeBtn = $('closePanelBtn');
