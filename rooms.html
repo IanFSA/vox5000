@@ -28,7 +28,7 @@
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:4px;">
       <div>
         <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:8px;">Your interview rooms</h1>
-        <p style="font-size:15px;color:var(--text2);max-width:520px;line-height:1.65;">Create reusable rooms for interviews, shows and remote guests. Rooms are stored in this browser until you delete them.</p>
+        <p style="font-size:15px;color:var(--text2);max-width:520px;line-height:1.65;">Rooms are stored in this browser. Open a room to rejoin as host, or copy the guest invite link to share.</p>
       </div>
       <a href="room.html" class="btn btn-record" style="text-decoration:none;align-self:flex-start;">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -38,7 +38,7 @@
 
     <div class="notice-bar" role="note">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
-      <span>Rooms are saved in <strong>this browser only</strong>. They won't appear on other devices or browsers. Clearing browser data may delete them.</span>
+      <span>Rooms are saved in <strong>this browser only</strong>. They will not appear on other devices or browsers. Clearing browser data may remove them.</span>
     </div>
 
     <div id="roomsList" aria-live="polite" aria-label="Your rooms"></div>
@@ -47,7 +47,7 @@
       <div class="card" style="text-align:center;padding:52px 24px;">
         <div style="font-size:40px;margin-bottom:20px;" aria-hidden="true">🎙</div>
         <h2 style="font-size:19px;font-weight:700;color:var(--text);margin-bottom:10px;">No rooms yet</h2>
-        <p style="font-size:14px;color:var(--text2);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.65;">Create a room, copy the invite link and send it to your guest. Each person records locally and you download separate tracks when done.</p>
+        <p style="font-size:14px;color:var(--text2);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.65;">Create a room and send the invite link to your guest. Each person records locally. You download separate tracks when done.</p>
         <a href="room.html" class="btn btn-record" style="text-decoration:none;display:inline-flex;">Create your first room</a>
       </div>
     </div>
@@ -62,49 +62,116 @@
   </footer>
 
   <script>
-    function getRooms(){try{return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}');}catch{return{};}}
-    function saveRooms(r){localStorage.setItem('vox5000_rooms',JSON.stringify(r));}
-
-    function render(){
-      const rooms=getRooms();
-      const list=document.getElementById('roomsList');
-      const none=document.getElementById('noRooms');
-      const keys=Object.keys(rooms);
-      if(keys.length===0){list.innerHTML='';none.style.display='block';return;}
-      none.style.display='none';
-      list.innerHTML=keys.map(id=>{
-        const r=rooms[id];
-        const date=r.created?new Date(r.created).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'Unknown';
-        return `<div class="card" style="margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-            <div>
-              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:5px;">${r.name||'Interview Room'}</div>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <span style="font-family:var(--mono);font-size:11px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-border);padding:2px 9px;border-radius:4px;">${id}</span>
-                <span style="font-size:12px;color:var(--text3);">Created ${date}</span>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <a href="room.html?r=${id}" class="btn btn-record btn-sm" style="text-decoration:none;">Open room</a>
-              <button onclick="copyLink('${id}')" class="btn btn-ghost btn-sm">📋 Copy link</button>
-              <button onclick="deleteRoom('${id}')" class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(255,59,59,0.25);">Delete</button>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
+    // ── Safe text helper — never insert user content via innerHTML ──
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    window.deleteRoom=function(id){
-      if(confirm('Delete this room? This cannot be undone.')){
-        const r=getRooms();delete r[id];saveRooms(r);render();
-      }
-    };
-    window.copyLink=function(id){
-      const url=`${location.origin}/room.html?r=${id}`;
-      navigator.clipboard.writeText(url).then(()=>{
-        alert('Invite link copied to clipboard!');
+    function getRooms() {
+      try { return JSON.parse(localStorage.getItem('vox5000_rooms') || '{}'); } catch { return {}; }
+    }
+    function saveRooms(r) { localStorage.setItem('vox5000_rooms', JSON.stringify(r)); }
+
+    function render() {
+      const rooms = getRooms();
+      const list = document.getElementById('roomsList');
+      const none = document.getElementById('noRooms');
+      const keys = Object.keys(rooms);
+
+      if (keys.length === 0) { list.innerHTML = ''; none.style.display = 'block'; return; }
+      none.style.display = 'none';
+      list.innerHTML = '';
+
+      keys.forEach(id => {
+        const r = rooms[id];
+        const date = r.created
+          ? new Date(r.created).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
+          : 'Unknown';
+
+        // Build card with DOM methods to prevent injection
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '10px';
+
+        const inner = document.createElement('div');
+        inner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;';
+
+        // Left: name + code + date
+        const left = document.createElement('div');
+
+        const nameEl = document.createElement('div');
+        nameEl.style.cssText = 'font-size:16px;font-weight:700;color:var(--text);margin-bottom:5px;';
+        nameEl.textContent = r.name || 'Interview Room'; // textContent is safe
+
+        const meta = document.createElement('div');
+        meta.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+        const codeEl = document.createElement('span');
+        codeEl.style.cssText = 'font-family:var(--mono);font-size:11px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-border);padding:2px 9px;border-radius:4px;';
+        codeEl.textContent = id; // room codes are generated alphanumeric — still use textContent
+
+        const dateEl = document.createElement('span');
+        dateEl.style.cssText = 'font-size:12px;color:var(--text3);';
+        dateEl.textContent = 'Created ' + date;
+
+        meta.appendChild(codeEl);
+        meta.appendChild(dateEl);
+        left.appendChild(nameEl);
+        left.appendChild(meta);
+
+        // Right: action buttons
+        const right = document.createElement('div');
+        right.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+
+        // ── P1 FIX: Open room uses ?host=1 flag so room.js recognises this browser as host ──
+        // Guest invite links use ?r=CODE only — no host flag — so guests never get host mode
+        const openBtn = document.createElement('a');
+        openBtn.href = `room.html?r=${encodeURIComponent(id)}&host=1`;
+        openBtn.className = 'btn btn-record btn-sm';
+        openBtn.style.textDecoration = 'none';
+        openBtn.textContent = 'Open as host';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-ghost btn-sm';
+        copyBtn.textContent = '📋 Copy guest link';
+        copyBtn.addEventListener('click', () => copyGuestLink(id));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-ghost btn-sm';
+        delBtn.style.cssText = 'color:var(--red);border-color:rgba(255,59,59,0.25);';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteRoom(id));
+
+        right.appendChild(openBtn);
+        right.appendChild(copyBtn);
+        right.appendChild(delBtn);
+
+        inner.appendChild(left);
+        inner.appendChild(right);
+        card.appendChild(inner);
+        list.appendChild(card);
       });
-    };
+    }
+
+    function deleteRoom(id) {
+      if (confirm('Delete this room? This cannot be undone.')) {
+        const r = getRooms();
+        delete r[id];
+        saveRooms(r);
+        render();
+      }
+    }
+
+    // Guest invite link — no &host=1 flag, so opens in guest mode
+    function copyGuestLink(id) {
+      const url = `${location.origin}/room.html?r=${encodeURIComponent(id)}`;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('Guest invite link copied!\n\nSend this to your guest. Do not use this link yourself — open the room using the "Open as host" button instead.');
+      }).catch(() => {
+        prompt('Copy this guest invite link:', url);
+      });
+    }
+
     render();
   </script>
 </body>
