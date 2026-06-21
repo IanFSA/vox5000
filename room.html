@@ -21,9 +21,64 @@
         <a href="rooms.html" class="nav-link">My Rooms</a>
         <a href="help.html" class="nav-link">Help</a>
       </nav>
-      <div class="on-air" id="onAir" aria-live="assertive"><span class="on-air-dot" aria-hidden="true"></span><span>ON AIR</span></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="on-air" id="onAir" aria-live="assertive"><span class="on-air-dot" aria-hidden="true"></span><span>ON AIR</span></div>
+        <button id="settingsBtn" title="Audio Settings" aria-label="Audio Settings" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:36px;height:36px;border-radius:var(--radius-sm);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">⚙</button>
+      </div>
     </div>
   </header>
+
+  <!-- ── AUDIO SETTINGS PANEL ── -->
+  <div id="settingsPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:300;align-items:center;justify-content:center;padding:20px;" role="dialog" aria-modal="true" aria-label="Audio Settings">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 style="font-size:17px;font-weight:700;color:var(--text);">⚙ Audio Settings</h2>
+        <button id="settingsCloseBtn" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:4px;line-height:1;" aria-label="Close settings">✕</button>
+      </div>
+
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Input Device</div>
+      <select id="settingsMicSelect" class="select" style="width:100%;margin-bottom:16px;"><option>Detecting microphones…</option></select>
+
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Output Device <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);font-size:10px;">(Chrome only)</span></div>
+      <select id="settingsOutputSelect" class="select" style="width:100%;margin-bottom:16px;"><option value="">Default output</option></select>
+
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Input Gain</div>
+      <div class="level-slider-row" style="margin-bottom:4px;">
+        <input type="range" id="settingsInputSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" style="flex:1;" aria-label="Input gain" />
+        <span class="level-slider-val" id="settingsInputVal">0 dB</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:16px;">How loud your mic is recorded</div>
+
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Output Volume</div>
+      <div class="level-slider-row" style="margin-bottom:4px;">
+        <input type="range" id="settingsOutputSlider" class="level-slider" min="0" max="2" step="0.05" value="1" style="flex:1;" aria-label="Output volume" />
+        <span class="level-slider-val" id="settingsOutputVal">100%</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:20px;">Volume of incoming guest audio in your headphones</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;padding-top:16px;border-top:1px solid var(--border);">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+          <div>
+            <div style="font-size:14px;font-weight:500;color:var(--text);">Noise suppression</div>
+            <div style="font-size:12px;color:var(--text3);">Reduces background noise (may affect voice quality)</div>
+          </div>
+          <input type="checkbox" id="settingsNoiseSuppression" style="width:18px;height:18px;accent-color:var(--yellow);cursor:pointer;flex-shrink:0;margin-left:16px;" />
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+          <div>
+            <div style="font-size:14px;font-weight:500;color:var(--text);">Echo cancellation</div>
+            <div style="font-size:12px;color:var(--text3);">Recommended off if using wired headphones</div>
+          </div>
+          <input type="checkbox" id="settingsEchoCancellation" style="width:18px;height:18px;accent-color:var(--yellow);cursor:pointer;flex-shrink:0;margin-left:16px;" />
+        </label>
+      </div>
+
+      <button class="btn btn-record" id="settingsMicTestBtn" style="width:100%;justify-content:center;margin-top:20px;">
+        🎙 Test mic (5 seconds)
+      </button>
+      <div id="settingsMicTestResult" style="font-size:12px;color:var(--text2);margin-top:8px;min-height:16px;text-align:center;"></div>
+    </div>
+  </div>
 
   <!-- ── SCREEN 1: Headphone check ── -->
   <div class="screen" id="headphoneScreen" role="main">
@@ -70,20 +125,30 @@
     </div>
   </div>
 
-  <!-- ── SCREEN 2b: Guest mic selector ── -->
+  <!-- ── SCREEN 2b: Guest mic selector + test ── -->
   <div class="screen" id="guestMicScreen" style="display:none;" role="main">
     <div class="screen-card">
       <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
       <div class="screen-step">Step 2b of 3</div>
-      <h1 class="screen-title">Choose your microphone</h1>
-      <p class="screen-sub">Select the microphone you want to use for this session.</p>
+      <h1 class="screen-title">Check your microphone</h1>
+      <p class="screen-sub">Select your mic and do a quick test before entering the room.</p>
       <div class="control-row" style="margin-bottom:16px;">
         <label for="guestMicSelect" class="field-label">Mic</label>
         <select id="guestMicSelect" class="select"><option value="">Detecting microphones…</option></select>
       </div>
       <div class="notice-bar" style="margin-bottom:16px;">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
-        <span>Allow microphone access when your browser asks, then select your mic above.</span>
+        <span>Allow microphone access when your browser asks.</span>
+      </div>
+      <!-- Guest mic test -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Mic Test</div>
+        <div class="meter-wrap" style="margin-bottom:10px;">
+          <div class="meter-bar" id="guestPreMeterBar"></div>
+          <div class="meter-peaks"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="guestMicTestBtn" style="width:100%;justify-content:center;">▶ Record 5s test</button>
+        <div id="guestMicTestResult" style="font-size:12px;color:var(--text2);margin-top:8px;min-height:16px;text-align:center;"></div>
       </div>
       <button class="btn btn-record" onclick="proceedToConsent()" style="width:100%;justify-content:center;">Continue →</button>
     </div>
@@ -128,6 +193,7 @@
       <p class="screen-sub" id="waitingSub">The host will let you in shortly. Keep this page open.</p>
       <div class="waiting-spinner" aria-hidden="true"></div>
       <p style="font-size:14px;color:var(--text2);margin-top:8px;" id="waitingNameDisplay"></p>
+      <button class="btn btn-ghost btn-sm" id="guestRejoinBtn" style="display:none;margin-top:16px;width:100%;justify-content:center;">↺ Try reconnecting</button>
     </div>
   </div>
 
@@ -214,7 +280,7 @@
         </div>
       </div>
 
-      <div id="sixtyMinWarning" style="display:none;" class="notice-bar" role="alert" style="margin-bottom:16px;">
+      <div id="sixtyMinWarning" style="display:none;" class="notice-bar" role="alert">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
         <span><strong>60 minutes reached.</strong> Keep all screens active — especially on mobile.</span>
       </div>
@@ -234,22 +300,15 @@
 
           <!-- Recording controls -->
           <div class="card recorder-card">
-            <div class="duration-display">
+            <div class="duration-display" style="align-items:center;">
               <span class="duration" id="hostDuration" aria-live="polite">00:00:00</span>
-              <span class="duration-status" id="hostDurStatus">Ready to record</span>
+              <span class="duration-status" id="hostDurStatus" style="align-self:center;">Ready to record</span>
             </div>
             <div class="controls">
               <button class="btn btn-record" id="recBtn"><span class="rec-dot" aria-hidden="true"></span> Record</button>
               <button class="btn btn-ghost" id="pauseBtn" disabled>⏸ Pause</button>
+              <button class="btn btn-ghost" id="hostSelfMuteBtn" title="Mute your mic">🎙 Mute mic</button>
             </div>
-            <div class="markers" role="group" aria-label="Markers">
-              <span class="markers-label" aria-hidden="true">Mark</span>
-              <button class="btn-marker" id="m1" disabled>Intro</button>
-              <button class="btn-marker" id="m2" disabled>Break</button>
-              <button class="btn-marker" id="m3" disabled>Outro</button>
-              <button class="btn-marker" id="m4" disabled>Clip</button>
-            </div>
-            <div class="marker-log" id="markerLog" aria-live="polite"></div>
           </div>
 
           <!-- Consent log -->
@@ -276,30 +335,25 @@
 
         <div class="room-right">
 
-          <!-- Waveform -->
-          <div class="waveform-section">
-            <div class="wave-header">
-              <span class="wave-title">Waveform Monitor</span>
-              <span class="wave-hint" aria-hidden="true">Active during recording · Red = clipping</span>
-            </div>
-            <canvas id="hostWaveCanvas" class="wave-canvas" height="120" aria-hidden="true"></canvas>
+          <!-- All participant waveforms -->
+          <div class="card" id="waveformCard">
+            <div class="card-label" style="margin-bottom:14px;">Live Levels</div>
+            <div id="allWaveforms"></div>
           </div>
 
-          <!-- Host level controls -->
+          <!-- Host input level -->
           <div class="card">
-            <div class="card-label" style="margin-bottom:14px;">Your Levels</div>
+            <div class="card-label" style="margin-bottom:14px;">Your Input Level</div>
             <div class="level-slider-row">
               <label class="level-slider-label" for="hostInputSlider">Input Gain</label>
               <input type="range" id="hostInputSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
               <span class="level-slider-val" id="hostInputVal">0 dB</span>
             </div>
             <div style="font-size:11px;color:var(--text3);margin-bottom:14px;padding-left:88px;">How loud your mic is recorded</div>
-            <div class="level-slider-row">
-              <label class="level-slider-label" for="hostMonitorSlider">Monitor</label>
-              <input type="range" id="hostMonitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
-              <span class="level-slider-val" id="hostMonitorVal">Off</span>
+            <div class="meter-wrap">
+              <div class="meter-bar" id="meter-local"></div>
+              <div class="meter-peaks"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
             </div>
-            <div style="font-size:11px;color:var(--text3);padding-left:88px;">Headphone vol — off by default to prevent flanging</div>
           </div>
 
           <!-- Chat -->
@@ -321,7 +375,7 @@
 
   <!-- ── GUEST ROOM ── -->
   <div id="guestRoom" style="display:none;">
-    <main class="room-main" style="max-width:680px;" role="main">
+    <main class="room-main" style="max-width:760px;" role="main">
 
       <!-- Guest status bar -->
       <div class="card" style="margin-bottom:14px;background:rgba(223,255,0,0.03);border-color:var(--yellow-border);">
@@ -338,7 +392,7 @@
       </div>
 
       <!-- Recording indicator with timer -->
-      <div id="guestTimerCard" style="display:none;margin-bottom:14px;" class="card" style="border-color:rgba(255,59,59,0.3);background:var(--red-dim);">
+      <div id="guestTimerCard" style="display:none;margin-bottom:14px;" class="card">
         <div style="display:flex;align-items:center;gap:14px;">
           <div style="width:12px;height:12px;border-radius:50%;background:var(--red);animation:blink 1s infinite;flex-shrink:0;" aria-hidden="true"></div>
           <span style="font-size:13px;font-weight:700;color:var(--red);letter-spacing:0.06em;text-transform:uppercase;">Recording</span>
@@ -352,13 +406,23 @@
         <p style="font-size:13px;color:var(--text2);">Your microphone is off. You can hear everyone and use chat but will not be recorded.</p>
       </div>
 
-      <!-- Waveform -->
+      <!-- Guest self-mute + controls row -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="guestControlsRow">
+        <button class="btn btn-ghost" id="guestSelfMuteBtn" style="flex:1;justify-content:center;">
+          🎙 Mute mic
+        </button>
+        <button class="btn btn-ghost btn-sm" id="guestBackupDownloadBtn" style="flex:1;justify-content:center;" title="Download your own backup recording">
+          ↓ My backup track
+        </button>
+      </div>
+
+      <!-- Guest waveform — own mic -->
       <div class="waveform-section" style="margin-bottom:14px;">
         <div class="wave-header">
-          <span class="wave-title">Your Mic Level</span>
-          <span class="wave-hint" aria-hidden="true">Active during recording · Red = clipping</span>
+          <span class="wave-title">Your Mic</span>
+          <span class="wave-hint" id="guestMicStatus">Waiting…</span>
         </div>
-        <canvas id="guestWaveCanvas" class="wave-canvas" height="80" aria-hidden="true"></canvas>
+        <canvas id="guestWaveCanvas" class="wave-canvas" height="70" aria-hidden="true"></canvas>
       </div>
 
       <!-- Guest level controls -->
@@ -370,27 +434,26 @@
           <span class="level-slider-val" id="guestInputVal">0 dB</span>
         </div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:14px;padding-left:88px;">How loud your mic is recorded</div>
-        <div class="meter-wrap" style="margin-bottom:5px;">
+        <div class="level-slider-row">
+          <label class="level-slider-label" for="guestOutputSlider">Guest Vol</label>
+          <input type="range" id="guestOutputSlider" class="level-slider" min="0" max="2" step="0.05" value="1" aria-label="Output volume" />
+          <span class="level-slider-val" id="guestOutputVal">100%</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);padding-left:88px;">Volume of host audio in your headphones</div>
+        <div class="meter-wrap" style="margin-top:14px;">
           <div class="meter-bar" id="guestMeterBar"></div>
           <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:14px;display:flex;gap:10px;">
+        <div style="font-size:10px;color:var(--text3);margin-top:5px;display:flex;gap:10px;">
           <span style="color:var(--green);">● Safe –24 to –6</span>
           <span style="color:var(--red);">● Clipping above –6</span>
         </div>
-        <div class="level-slider-row">
-          <label class="level-slider-label" for="guestMonitorSlider">Monitor</label>
-          <input type="range" id="guestMonitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
-          <span class="level-slider-val" id="guestMonitorVal">Off</span>
-        </div>
-        <div style="font-size:11px;color:var(--text3);padding-left:88px;">Headphone vol — off by default to prevent flanging</div>
       </div>
 
-      <!-- Guest self-mute -->
-      <div style="margin-bottom:14px;">
-        <button class="btn btn-ghost" id="guestSelfMuteBtn" style="width:100%;justify-content:center;">
-          🎙 Mute mic
-        </button>
+      <!-- Speaking indicators (other participants) -->
+      <div class="card" id="guestSpeakingCard" style="display:none;margin-bottom:14px;">
+        <div class="card-label" style="margin-bottom:10px;">In the room</div>
+        <div id="guestSpeakingList"></div>
       </div>
 
       <!-- Upload progress -->
@@ -399,9 +462,6 @@
         <div class="transfer-bar-wrap" style="margin-bottom:8px;"><div class="transfer-bar-fill" id="guestUploadBar"></div></div>
         <div style="font-size:13px;color:var(--text2);" id="guestUploadPct" aria-live="polite">0%</div>
         <p style="font-size:12px;color:var(--text3);margin-top:10px;">⚠ Keep this page open until complete.</p>
-        <button class="btn btn-ghost btn-sm" id="guestFallbackBtn" style="margin-top:12px;display:none;width:100%;justify-content:center;">
-          ↓ Download my backup track
-        </button>
       </div>
 
       <!-- Done -->

@@ -14,20 +14,23 @@ let roomId=params.get('r');
 const isHost=!roomId;
 let myName='',myPeerId='',myConsented=false,myIsObserver=false;
 let recording=false,paused=false,elapsed=0,startTime,timerInterval;
-let markers=[];
 let mediaRecorder,chunks=[],rawChunks=[];
 let audioCtx,localStream;
-let gainNode,monitorGainNode; // host audio nodes
-let guestGainNode,guestMonitorGainNode,guestAnalyser; // guest audio nodes
-let hostAnalyser; // separate analyser for host waveform/meter
+let gainNode,hostAnalyser;
+let guestGainNode,guestAnalyser;
 const WAVE_HISTORY=600;
 const peers={};
 const receivedChunks={},receivedMeta={};
-const remoteGainNodes={};
 let peer;
 const consentLog=[];
 let hostReturning=false;
 let guestBackupBlob=null;
+let masterOutputVolume=1;
+let inputGainDb=0;
+let noiseSuppression=false;
+let echoCancellation=false;
+let currentMicId=undefined;
+let hostSelfMuted=false;
 
 // ── Storage ──
 function getRooms(){try{return JSON.parse(localStorage.getItem('vox5000_rooms')||'{}');}catch{return{};}}
@@ -74,7 +77,6 @@ function checkHostReturn(){
   return false;
 }
 
-// ── Room name (host only) ──
 if(isHost)$('roomNameSection').style.display='block';
 
 // ── Headphone screens ──
@@ -110,20 +112,18 @@ async function enterRoom(){
     consentLog.push({name:myName,role:'Host',consented:true,observer:false,timestamp:tsNow(),...info,roomId});
     showLoadingThenHostRoom();
   } else {
-    // Guest — go to mic selector, then consent
     $('nameScreen').style.display='none';
     showGuestMicSelect();
   }
 }
 
-// ── Guest mic selector ──
+// ── Guest mic selector + pre-room test ──
+let preMeterActive=false;
+let preMeterStream=null;
+
 async function showGuestMicSelect(){
   const screen=$('guestMicScreen');
-  if(!screen){
-    // No mic screen in HTML — go straight to consent
-    $('consentScreen').style.display='flex';
-    return;
-  }
+  if(!screen){$('consentScreen').style.display='flex';return;}
   screen.style.display='flex';
   try{
     const tmp=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -140,10 +140,90 @@ async function showGuestMicSelect(){
         sel.appendChild(opt);
       });
     }
+    // Start live meter for pre-room mic check
+    startPreMeter();
   }catch(e){console.warn('Mic enum error',e);}
+
+  // Mic change → restart meter
+  const sel=$('guestMicSelect');
+  if(sel){
+    sel.addEventListener('change',()=>{
+      stopPreMeter();
+      startPreMeter();
+    });
+  }
+
+  // Mic test button
+  const testBtn=$('guestMicTestBtn');
+  if(testBtn){
+    testBtn.addEventListener('click',async()=>{
+      testBtn.disabled=true;
+      const res=$('guestMicTestResult');
+      if(res)res.textContent='Recording…';
+      try{
+        const deviceId=$('guestMicSelect')&&$('guestMicSelect').value;
+        const s=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined,echoCancellation:false,noiseSuppression:false}});
+        const ctx=new AudioContext();
+        const dest=ctx.createMediaStreamDestination();
+        const src=ctx.createMediaStreamSource(s);
+        src.connect(dest);
+        const mr=new MediaRecorder(dest.stream);
+        const bufs=[];
+        mr.ondataavailable=e=>{if(e.data.size>0)bufs.push(e.data);};
+        mr.onstop=async()=>{
+          s.getTracks().forEach(t=>t.stop());
+          const blob=new Blob(bufs,{type:mr.mimeType});
+          const url=URL.createObjectURL(blob);
+          const audio=new Audio(url);
+          audio.play();
+          if(res)res.textContent='▶ Playing back… Listen for your voice.';
+          audio.onended=()=>{
+            URL.revokeObjectURL(url);
+            if(res)res.textContent='✓ Test done. If you heard yourself, your mic is working.';
+            testBtn.disabled=false;
+          };
+        };
+        mr.start();
+        setTimeout(()=>mr.stop(),5000);
+      }catch(e){
+        if(res)res.textContent='⚠ Could not access mic. Check permissions.';
+        testBtn.disabled=false;
+      }
+    });
+  }
+}
+
+function startPreMeter(){
+  if(preMeterActive)return;
+  preMeterActive=true;
+  const deviceId=$('guestMicSelect')&&$('guestMicSelect').value;
+  navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined,echoCancellation:false,noiseSuppression:false}})
+    .then(s=>{
+      preMeterStream=s;
+      const ctx=new AudioContext();
+      const src=ctx.createMediaStreamSource(s);
+      const anal=ctx.createAnalyser();anal.fftSize=512;
+      src.connect(anal);
+      const buf=new Uint8Array(anal.frequencyBinCount);
+      function tick(){
+        if(!preMeterActive)return;
+        anal.getByteTimeDomainData(buf);
+        let max=0;
+        for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>max)max=v;}
+        const fill=$('guestPreMeterBar');
+        if(fill)fill.style.width=Math.min(100,Math.round(max*200))+'%';
+        requestAnimationFrame(tick);
+      }tick();
+    }).catch(()=>{});
+}
+
+function stopPreMeter(){
+  preMeterActive=false;
+  if(preMeterStream){preMeterStream.getTracks().forEach(t=>t.stop());preMeterStream=null;}
 }
 
 window.proceedToConsent=function(){
+  stopPreMeter();
   const screen=$('guestMicScreen');
   if(screen)screen.style.display='none';
   $('consentScreen').style.display='flex';
@@ -190,11 +270,9 @@ function initPeer(id){
   peer.on('connection',conn=>handleIncomingConn(conn));
   peer.on('call',call=>{
     getMic().then(s=>{
-      // Answer — if observer send empty stream, else send mic
       call.answer(myIsObserver?new MediaStream():s);
       call.on('stream',remote=>{
         addRemoteAudio(call.peer,remote);
-        // Only set up analyser if remote stream has tracks
         if(remote&&remote.getAudioTracks().length>0){
           setupRemoteAnalyser(call.peer,remote);
         }
@@ -203,7 +281,19 @@ function initPeer(id){
   });
   peer.on('error',err=>{
     console.error('Peer error:',err.type,err);
-    if(!isHost&&err.type==='peer-unavailable')guestSystemMsg('Could not connect to host. Check the link and try again.');
+    if(!isHost&&err.type==='peer-unavailable'){
+      guestSystemMsg('Could not connect to host. Check the link and try again.');
+      const rb=$('guestRejoinBtn');if(rb)rb.style.display='block';
+    }
+  });
+  peer.on('disconnected',()=>{
+    if(!isHost){
+      guestSystemMsg('Connection lost. Trying to reconnect…');
+      const rb=$('guestRejoinBtn');if(rb)rb.style.display='block';
+      setTimeout(()=>{
+        if(peer&&!peer.destroyed){try{peer.reconnect();}catch(e){}}
+      },2000);
+    }
   });
 }
 
@@ -211,12 +301,12 @@ function initPeer(id){
 function getMic(){
   if(localStream&&localStream.active)return Promise.resolve(localStream);
   const guestMicSel=$('guestMicSelect');
-  const deviceId=guestMicSel?guestMicSel.value:undefined;
+  const deviceId=currentMicId||(guestMicSel?guestMicSel.value:undefined);
   return navigator.mediaDevices.getUserMedia({
     audio:{
       deviceId:deviceId?{exact:deviceId}:undefined,
-      echoCancellation:false,
-      noiseSuppression:false,
+      echoCancellation:echoCancellation,
+      noiseSuppression:noiseSuppression,
       autoGainControl:false,
       sampleRate:{ideal:48000}
     }
@@ -231,7 +321,10 @@ function connectToHost(){
     peers['host']={conn,name:'Host',transferring:false};
   });
   conn.on('data',data=>handleHostMessage(data,conn));
-  conn.on('close',()=>guestSystemMsg('Disconnected from host.'));
+  conn.on('close',()=>{
+    guestSystemMsg('Disconnected from host.');
+    const rb=$('guestRejoinBtn');if(rb)rb.style.display='block';
+  });
   conn.on('error',err=>console.error('Guest conn error:',err));
 }
 
@@ -240,14 +333,16 @@ function handleHostMessage(data,conn){
     $('waitingScreen').style.display='none';
     showGuestRoom();
     getMic().then(s=>{
-      // Set up audio graph BEFORE calling
       setupGuestAudioGraph(s);
-      // Call host with mic stream (or empty if observer)
       const callStream=myIsObserver?new MediaStream():s;
       const call=peer.call(`HOST-${roomId}`,callStream);
       call.on('stream',remote=>{
-        // Host audio comes back — play it directly via audio element
         addRemoteAudio('host',remote);
+        applyOutputVolume(masterOutputVolume);
+        // Speaking indicator for host
+        if(remote&&remote.getAudioTracks().length>0){
+          setupGuestSpeakingIndicator('host','Host',remote);
+        }
       });
     });
     guestSystemMsg(`You're in the room${myIsObserver?' as an Observer':''}.`);
@@ -264,6 +359,7 @@ function handleHostMessage(data,conn){
     $('guestRoom').style.display='block';
     if(!myIsObserver)startGuestRecording();
     $('guestStatusDisplay').textContent='🔴 Recording';
+    $('guestMicStatus').textContent='Active during recording · Red = clipping';
   }
   if(data.type==='record_stop'){if(!myIsObserver)stopGuestRecording(conn);}
   if(data.type==='record_pause'){
@@ -293,6 +389,9 @@ function handleHostMessage(data,conn){
     $('guestUploadCard').style.display='none';
     showGuestTransferFailed();
   }
+  if(data.type==='participant_update'){
+    updateGuestSpeakingList(data.participants);
+  }
 }
 
 function updateGuestMuteUI(muted){
@@ -319,13 +418,16 @@ function handleIncomingConn(conn){
   conn.on('data',data=>{
     if(data.type==='join_request'){
       if(peers[conn.peer]&&!peers[conn.peer].pending)return;
-      peers[conn.peer]={conn,name:data.name,pending:true,consented:data.consented,observer:data.observer,muted:false,transferring:false};
+      peers[conn.peer]={conn,name:data.name,pending:true,consented:data.consented,observer:data.observer,muted:false,selfMuted:false,transferring:false};
       showWaitingGuest(conn.peer,data.name,data.consented,data.observer);
       getVisitorInfo().then(info=>{
         consentLog.push({name:data.name,role:data.observer?'Observer':'Guest',consented:data.consented,observer:data.observer,timestamp:tsNow(),roomId,...info});
       });
     }
     if(data.type==='chat'){hostAddChat(data.sender,data.text,false);broadcastToGuests({type:'chat',sender:data.sender,text:data.text},conn.peer);}
+    if(data.type==='self_muted'){
+      const p=peers[conn.peer];if(p){p.selfMuted=data.muted;renderParticipants();}
+    }
     if(data.type==='file_meta'){
       receivedMeta[conn.peer]=data;
       receivedChunks[conn.peer]=[];
@@ -344,7 +446,7 @@ function handleIncomingConn(conn){
     if(data.type==='file_done')finaliseGuestTrack(conn.peer,conn);
     if(data.type==='guest_leaving'){
       hostSystemMsg(`${peers[conn.peer]?.name||'A guest'} has left.`);
-      delete peers[conn.peer];renderParticipants();
+      delete peers[conn.peer];renderParticipants();broadcastParticipantUpdate();
     }
   });
   conn.on('close',()=>{
@@ -361,8 +463,16 @@ function handleIncomingConn(conn){
       const row=$(`wait-${conn.peer}`);if(row)row.remove();
       if($('waitingList').children.length===0)$('waitingQueue').style.display='none';
     }
-    delete peers[conn.peer];renderParticipants();
+    delete peers[conn.peer];renderParticipants();broadcastParticipantUpdate();
   });
+}
+
+function broadcastParticipantUpdate(){
+  const list=[{name:myName,isHost:true,muted:hostSelfMuted}];
+  Object.entries(peers).forEach(([pid,p])=>{
+    if(!p.pending)list.push({name:p.name,muted:p.muted||p.selfMuted,observer:p.observer});
+  });
+  broadcastToGuests({type:'participant_update',participants:list});
 }
 
 function showWaitingGuest(peerId,name,consented,observer){
@@ -384,15 +494,12 @@ function showWaitingGuest(peerId,name,consented,observer){
   showGuestWaitingAlert(peerId,name);
 }
 
-// ── Guest waiting alert ──
 function showGuestWaitingAlert(peerId,name){
-  const alert=$('guestAlert');
-  if(!alert)return;
+  const alert=$('guestAlert');if(!alert)return;
   $('guestAlertName').textContent=`${name} wants to join`;
   alert.style.display='block';
   $('guestAlertAdmit').onclick=()=>{alert.style.display='none';admitGuest(peerId);};
   $('guestAlertDismiss').onclick=()=>{alert.style.display='none';};
-  // Browser notification
   if(Notification&&Notification.permission==='granted'){
     new Notification('Vox5000',{body:`${name} is waiting to join your room`,icon:'favicon-512.png'});
   } else if(Notification&&Notification.permission!=='denied'){
@@ -400,7 +507,6 @@ function showGuestWaitingAlert(peerId,name){
       if(p==='granted')new Notification('Vox5000',{body:`${name} is waiting to join`,icon:'favicon-512.png'});
     });
   }
-  // Tab title badge
   document.title=`⚡ ${name} waiting — Vox5000`;
   setTimeout(()=>{document.title=`Vox5000 — ${(getRooms()[roomId]||{}).name||'Interview Room'}`;},8000);
 }
@@ -410,12 +516,11 @@ window.admitGuest=function(peerId){
   p.pending=false;
   p.conn.send({type:'admitted'});
   getMic().then(s=>{
-    // Set up host audio graph if not done
     if(!hostAnalyser)setupHostAudioGraph(s);
-    // Call guest with host mic
     const call=peer.call(peerId,s);
     call.on('stream',remote=>{
       addRemoteAudio(peerId,remote);
+      applyOutputVolume(masterOutputVolume);
       if(remote&&remote.getAudioTracks().length>0)setupRemoteAnalyser(peerId,remote);
     });
     p.call=call;
@@ -424,6 +529,7 @@ window.admitGuest=function(peerId){
   if($('waitingList').children.length===0)$('waitingQueue').style.display='none';
   renderParticipants();
   hostSystemMsg(`${p.name} has joined${p.observer?' as Observer':''}.`);
+  broadcastParticipantUpdate();
   if(recording&&!p.observer)p.conn.send({type:'record_start'});
 };
 
@@ -442,7 +548,7 @@ window.kickGuest=function(peerId){
   setTimeout(()=>{
     try{p.conn.close();}catch(e){}
     const audio=$(`audio-${peerId}`);if(audio)audio.remove();
-    delete peers[peerId];renderParticipants();
+    delete peers[peerId];renderParticipants();broadcastParticipantUpdate();
     hostSystemMsg(`${p.name} has been removed.`);
   },500);
 };
@@ -461,47 +567,34 @@ function showThankyou(msg){
 }
 
 // ── AUDIO GRAPH ──
-// HOST: mic → gainNode → hostAnalyser → [NOT to speakers — avoid flanging]
-// The host hears guests via WebRTC audio elements only
-// Monitor is a separate optional path: gainNode → monitorGain → speakers
 function setupHostAudioGraph(s){
   if(!audioCtx||audioCtx.state==='closed')audioCtx=new AudioContext({sampleRate:48000});
   localStream=s;
   const src=audioCtx.createMediaStreamSource(s);
-  gainNode=audioCtx.createGain();gainNode.gain.value=1; // 0dB default
+  gainNode=audioCtx.createGain();gainNode.gain.value=dbToGain(inputGainDb);
   hostAnalyser=audioCtx.createAnalyser();hostAnalyser.fftSize=1024;
-  monitorGainNode=audioCtx.createGain();monitorGainNode.gain.value=0; // monitor OFF by default
   src.connect(gainNode);
   gainNode.connect(hostAnalyser);
-  // Monitor path — optional headphone monitoring
-  gainNode.connect(monitorGainNode);
-  monitorGainNode.connect(audioCtx.destination);
-  // Start meter and waveform
+  // No connection to destination — avoids flanging
   drawMeter('local',hostAnalyser);
-  drawWave('hostWaveCanvas',hostAnalyser);
+  addWaveformRow('local',myName+' (You)',hostAnalyser);
 }
 
-// GUEST: mic → gainNode → guestAnalyser → [stream goes to WebRTC]
-// Monitor is separate: guestAnalyser → monitorGain → speakers (OFF by default)
-// This ensures the guest's mic goes OUT via WebRTC cleanly without double-routing
 function setupGuestAudioGraph(s){
   if(!audioCtx||audioCtx.state==='closed')audioCtx=new AudioContext({sampleRate:48000});
   localStream=s;
   const src=audioCtx.createMediaStreamSource(s);
-  guestGainNode=audioCtx.createGain();guestGainNode.gain.value=1;
+  guestGainNode=audioCtx.createGain();guestGainNode.gain.value=dbToGain(inputGainDb);
   guestAnalyser=audioCtx.createAnalyser();guestAnalyser.fftSize=1024;
-  guestMonitorGainNode=audioCtx.createGain();guestMonitorGainNode.gain.value=0; // OFF by default
   src.connect(guestGainNode);
   guestGainNode.connect(guestAnalyser);
-  // Monitor only — does NOT connect guestAnalyser to destination to avoid feedback
-  guestGainNode.connect(guestMonitorGainNode);
-  guestMonitorGainNode.connect(audioCtx.destination);
-  // Meter and waveform
+  // No connection to destination — avoids self-monitoring feedback
   drawGuestMeter(guestAnalyser);
   drawWave('guestWaveCanvas',guestAnalyser);
+  $('guestMicStatus').textContent='Active — speak to see your level';
 }
 
-// Remote audio — straight to audio element (WebRTC handles it)
+// ── Remote audio ──
 function addRemoteAudio(peerId,remoteStream){
   let a=$(`audio-${peerId}`);
   if(!a){
@@ -512,34 +605,107 @@ function addRemoteAudio(peerId,remoteStream){
     $('audioElements').appendChild(a);
   }
   a.srcObject=remoteStream;
+  a.volume=masterOutputVolume>1?1:masterOutputVolume;
 }
 
-// Remote analyser for level metering of guests (host side)
+function applyOutputVolume(vol){
+  masterOutputVolume=vol;
+  document.querySelectorAll('#audioElements audio').forEach(a=>{
+    a.volume=Math.max(0,Math.min(1,vol>1?1:vol));
+  });
+}
+
+// ── Remote analyser ──
 function setupRemoteAnalyser(peerId,remote){
   if(!audioCtx)return;
   try{
     const gain=audioCtx.createGain();gain.gain.value=1;
-    remoteGainNodes[peerId]=gain;
     const anal=audioCtx.createAnalyser();anal.fftSize=512;
     const src=audioCtx.createMediaStreamSource(remote);
     src.connect(gain);
     gain.connect(anal);
-    // Note: do NOT connect to audioCtx.destination here
-    // Audio is already playing through the <audio> element
-    // Connecting to destination too would cause double playback
+    // Not connected to destination — audio plays through <audio> element
     if(peers[peerId])peers[peerId].analyser=anal;
     drawMeter(peerId,anal);
+    if(isHost){
+      const p=peers[peerId];
+      addWaveformRow(peerId,p?p.name:'Guest',anal);
+    }
     monitorPeerClipping(peerId,anal);
   }catch(e){console.warn('Remote analyser error:',e);}
 }
 
-window.setGuestVolume=function(peerId,val){
-  // Control volume of the audio element directly
-  const audio=$(`audio-${peerId}`);
-  if(audio)audio.volume=Math.max(0,Math.min(2,parseFloat(val)));
-  const label=$(`vol-label-${peerId}`);
-  if(label)label.textContent=Math.round(parseFloat(val)*100)+'%';
-};
+// ── All-participant waveforms (host view) ──
+function addWaveformRow(id,name,analyser){
+  const container=$('allWaveforms');if(!container)return;
+  // Remove existing if re-adding
+  const existing=document.getElementById(`wrow-${id}`);if(existing)existing.remove();
+
+  const wrap=document.createElement('div');
+  wrap.id=`wrow-${id}`;
+  wrap.style.cssText='margin-bottom:14px;';
+  wrap.innerHTML=`
+    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">${name}</div>
+    <canvas id="wave-${id}" class="wave-canvas" height="50" style="border-radius:4px;" aria-hidden="true"></canvas>`;
+  container.appendChild(wrap);
+  drawWave(`wave-${id}`,analyser);
+}
+
+// ── Guest speaking indicators ──
+function setupGuestSpeakingIndicator(peerId,name,remoteStream){
+  if(!audioCtx){audioCtx=new AudioContext({sampleRate:48000});}
+  try{
+    const anal=audioCtx.createAnalyser();anal.fftSize=256;
+    const src=audioCtx.createMediaStreamSource(remoteStream);
+    src.connect(anal);
+
+    // Ensure the speaking card is visible
+    const card=$('guestSpeakingCard');if(card)card.style.display='block';
+
+    // Add/update indicator row
+    const list=$('guestSpeakingList');if(!list)return;
+    let row=document.getElementById(`speak-${peerId}`);
+    if(!row){
+      row=document.createElement('div');
+      row.id=`speak-${peerId}`;
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);';
+      row.innerHTML=`
+        <div id="speak-dot-${peerId}" style="width:10px;height:10px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background 0.1s;"></div>
+        <span style="font-size:13px;color:var(--text2);">${name}</span>`;
+      list.appendChild(row);
+    }
+
+    const dot=document.getElementById(`speak-dot-${peerId}`);
+    const buf=new Uint8Array(anal.frequencyBinCount);
+    function tick(){
+      anal.getByteTimeDomainData(buf);
+      let max=0;
+      for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>max)max=v;}
+      if(dot)dot.style.background=max>0.04?'var(--green)':'rgba(255,255,255,0.08)';
+      requestAnimationFrame(tick);
+    }tick();
+  }catch(e){console.warn('Speaking indicator error:',e);}
+}
+
+function updateGuestSpeakingList(participants){
+  // Update speaking list with participant names and mute states
+  const list=$('guestSpeakingList');if(!list)return;
+  const card=$('guestSpeakingCard');if(card)card.style.display='block';
+  participants.forEach(p=>{
+    if(p.name===myName)return; // skip self
+    let row=document.getElementById(`speak-name-${p.name.replace(/\s/g,'_')}`);
+    if(!row){
+      row=document.createElement('div');
+      row.id=`speak-name-${p.name.replace(/\s/g,'_')}`;
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);';
+      list.appendChild(row);
+    }
+    const muteIcon=p.muted?'🔇 ':'';
+    row.innerHTML=`
+      <div style="width:10px;height:10px;border-radius:50%;background:${p.muted?'var(--red-dim)':'rgba(255,255,255,0.08)'};flex-shrink:0;"></div>
+      <span style="font-size:13px;color:var(--text2);">${muteIcon}${p.name}${p.isHost?' (Host)':''}</span>`;
+  });
+}
 
 // ── Meters ──
 function drawMeter(id,anal){
@@ -561,7 +727,7 @@ function drawGuestMeter(anal){
     let max=0;
     for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>max)max=v;}
     const fill=$('guestMeterBar');
-    if(fill)fill.style.setProperty('--level',Math.min(100,Math.round(max*200))+'%');
+    if(fill)fill.style.width=Math.min(100,Math.round(max*200))+'%';
     requestAnimationFrame(tick);
   }tick();
 }
@@ -576,14 +742,11 @@ function drawWave(canvasId,anal){
     if(canvas.width!==W)canvas.width=W;
     const H=canvas.height,mid=H/2;
     const buf=new Uint8Array(anal.frequencyBinCount);
-    // Only accumulate waveform data while recording/active
-    if(recording||!isHost){
-      try{anal.getByteTimeDomainData(buf);}catch{}
-      let peak=0,clip=false;
-      for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>peak)peak=v;if(buf[i]>242||buf[i]<13)clip=true;}
-      buf2.push({peak,clipping:clip});
-      if(buf2.length>WAVE_HISTORY)buf2.shift();
-    }
+    try{anal.getByteTimeDomainData(buf);}catch{}
+    let peak=0,clip=false;
+    for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]-128)/128;if(v>peak)peak=v;if(buf[i]>242||buf[i]<13)clip=true;}
+    buf2.push({peak,clipping:clip});
+    if(buf2.length>WAVE_HISTORY)buf2.shift();
     ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,W,H);
     const clipH=H*0.06;
     ctx.fillStyle='rgba(255,59,59,0.07)';ctx.fillRect(0,0,W,clipH);ctx.fillRect(0,H-clipH,W,clipH);
@@ -633,7 +796,8 @@ function showHostRoom(){
   getMic().then(s=>setupHostAudioGraph(s));
   renderParticipants();
   setupHostControls();
-  setupHostLevelSliders();
+  setupHostInputSlider();
+  setupSettingsPanel();
 }
 
 function showGuestRoom(){
@@ -645,6 +809,7 @@ function showGuestRoom(){
     $('observerBanner').style.display='block';
     $('guestConsentBadge').textContent='👁 Observer';
     $('guestConsentBadge').className='badge-observer';
+    $('guestControlsRow').style.display='none';
   } else {
     $('guestConsentBadge').textContent='🟢 Consented';
     $('guestConsentBadge').className='badge-consented';
@@ -652,37 +817,39 @@ function showGuestRoom(){
     setupGuestLevelSliders();
   }
   setupGuestControls();
+  setupSettingsPanel();
 }
 
 // ── Participants ──
 function renderParticipants(){
   const list=$('participantsList');list.innerHTML='';
-  list.appendChild(makeParticipantRow(myPeerId,myName,true,true,true,false));
+  list.appendChild(makeParticipantRow(myPeerId,myName,true,true,true,false,hostSelfMuted));
   Object.entries(peers).forEach(([pid,p])=>{
     if(p.pending)return;
-    list.appendChild(makeParticipantRow(pid,p.name,false,false,p.consented,p.observer));
+    list.appendChild(makeParticipantRow(pid,p.name,false,false,p.consented,p.observer,p.muted||p.selfMuted));
   });
   const total=1+Object.values(peers).filter(p=>!p.pending).length;
   $('participantCount').textContent=`${total}/6`;
 }
 
-function makeParticipantRow(pid,name,isHostUser,isMe,consented,observer){
+function makeParticipantRow(pid,name,isHostUser,isMe,consented,observer,muted){
   const div=document.createElement('div');
   div.className='participant-row'+(isHostUser?' is-host':'');
   div.id=`prow-${pid}`;
   const p=peers[pid]||{};
 
+  const muteIcon=muted?'🔇 ':'';
   const badge=isHostUser
-    ?'<span class="chip chip-ready">🎙 Host</span>'
+    ?`<span class="chip chip-ready">${muteIcon}🎙 Host${muted?' (Muted)':''}</span>`
     :observer?'<span class="chip chip-observer">👁 Observer</span>'
-    :consented?'<span class="chip chip-consented">🟢 Consented</span>'
+    :consented?`<span class="chip chip-consented">${muteIcon}🟢 Consented${muted?' · Muted':''}</span>`
     :'<span style="font-size:11px;color:#FF8844;">⚠ Not consented</span>';
 
-  // Volume slider — controls audio element volume (0-150%)
+  // Per-guest volume slider (host only, for non-self guests)
   const volControls=(!isMe&&!isHostUser&&!observer)?`
     <div class="participant-vol">
       <div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-align:center;">Hear vol</div>
-      <input type="range" min="0" max="1.5" step="0.05" value="1"
+      <input type="range" min="0" max="2" step="0.05" value="1"
         class="vol-slider"
         oninput="setGuestVolume('${pid}',this.value)"
         aria-label="Volume for ${name}" />
@@ -712,48 +879,242 @@ window.toggleMute=function(peerId){
   const p=peers[peerId];if(!p)return;
   p.muted=!p.muted;
   p.conn.send({type:'mute_you',muted:p.muted});
-  // Update button immediately
   const btn=$(`mute-${peerId}`);
   if(btn){btn.textContent=p.muted?'Unmute':'Mute';btn.classList.toggle('muted',p.muted);}
+  renderParticipants();
+  broadcastParticipantUpdate();
 };
 
+window.setGuestVolume=function(peerId,val){
+  const audio=$(`audio-${peerId}`);
+  const v=Math.max(0,Math.min(2,parseFloat(val)));
+  if(audio)audio.volume=v>1?1:v;
+  const label=$(`vol-label-${peerId}`);
+  if(label)label.textContent=Math.round(v*100)+'%';
+};
+
+// ── Host self-mute ──
+function toggleHostSelfMute(){
+  hostSelfMuted=!hostSelfMuted;
+  if(localStream)localStream.getAudioTracks().forEach(t=>{t.enabled=!hostSelfMuted;});
+  const btn=$('hostSelfMuteBtn');
+  if(btn){
+    btn.textContent=hostSelfMuted?'🔇 Unmute mic':'🎙 Mute mic';
+    btn.style.borderColor=hostSelfMuted?'rgba(255,59,59,0.5)':'';
+    btn.style.color=hostSelfMuted?'var(--red)':'';
+  }
+  renderParticipants();
+  broadcastParticipantUpdate();
+  hostSystemMsg(hostSelfMuted?'Your mic is muted — guests cannot hear you and you will not be recorded.':'Your mic is unmuted.');
+}
+
 // ── Level sliders ──
-function setupHostLevelSliders(){
-  const inputSl=$('hostInputSlider'),monSl=$('hostMonitorSlider');
-  const inputV=$('hostInputVal'),monV=$('hostMonitorVal');
+function setupHostInputSlider(){
+  const inputSl=$('hostInputSlider'),inputV=$('hostInputVal');
   if(inputSl){
     inputSl.addEventListener('input',()=>{
-      const db=parseFloat(inputSl.value);
-      if(inputV)inputV.textContent=fmtDb(db);
-      if(gainNode)gainNode.gain.value=dbToGain(db);
-    });
-  }
-  if(monSl){
-    monSl.value='-60'; // ensure monitor starts at OFF
-    monSl.addEventListener('input',()=>{
-      const db=parseFloat(monSl.value);
-      if(monV)monV.textContent=fmtDb(db);
-      if(monitorGainNode)monitorGainNode.gain.value=dbToGain(db);
+      inputGainDb=parseFloat(inputSl.value);
+      if(inputV)inputV.textContent=fmtDb(inputGainDb);
+      if(gainNode)gainNode.gain.value=dbToGain(inputGainDb);
     });
   }
 }
 
 function setupGuestLevelSliders(){
-  const inputSl=$('guestInputSlider'),monSl=$('guestMonitorSlider');
-  const inputV=$('guestInputVal'),monV=$('guestMonitorVal');
+  const inputSl=$('guestInputSlider'),inputV=$('guestInputVal');
   if(inputSl){
     inputSl.addEventListener('input',()=>{
-      const db=parseFloat(inputSl.value);
-      if(inputV)inputV.textContent=fmtDb(db);
-      if(guestGainNode)guestGainNode.gain.value=dbToGain(db);
+      inputGainDb=parseFloat(inputSl.value);
+      if(inputV)inputV.textContent=fmtDb(inputGainDb);
+      if(guestGainNode)guestGainNode.gain.value=dbToGain(inputGainDb);
     });
   }
-  if(monSl){
-    monSl.value='-60'; // monitor OFF by default
-    monSl.addEventListener('input',()=>{
-      const db=parseFloat(monSl.value);
-      if(monV)monV.textContent=fmtDb(db);
-      if(guestMonitorGainNode)guestMonitorGainNode.gain.value=dbToGain(db);
+  const outSl=$('guestOutputSlider'),outV=$('guestOutputVal');
+  if(outSl){
+    outSl.addEventListener('input',()=>{
+      const val=parseFloat(outSl.value);
+      applyOutputVolume(val);
+      if(outV)outV.textContent=Math.round(val*100)+'%';
+    });
+  }
+}
+
+// ── Settings panel ──
+function setupSettingsPanel(){
+  const btn=$('settingsBtn');
+  const panel=$('settingsPanel');
+  const closeBtn=$('settingsCloseBtn');
+  if(!btn||!panel)return;
+
+  // Populate device lists
+  async function populateDevices(){
+    try{
+      await navigator.mediaDevices.getUserMedia({audio:true}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
+      const devices=await navigator.mediaDevices.enumerateDevices();
+      const mics=devices.filter(d=>d.kind==='audioinput');
+      const outputs=devices.filter(d=>d.kind==='audiooutput');
+      const micSel=$('settingsMicSelect');
+      if(micSel){
+        micSel.innerHTML='';
+        mics.forEach((d,i)=>{
+          const opt=document.createElement('option');
+          opt.value=d.deviceId;
+          opt.textContent=d.label||`Microphone ${i+1}`;
+          if(d.deviceId===currentMicId)opt.selected=true;
+          micSel.appendChild(opt);
+        });
+      }
+      const outSel=$('settingsOutputSelect');
+      if(outSel){
+        if(outputs.length>0){
+          outSel.innerHTML='<option value="">Default output</option>';
+          outputs.forEach((d,i)=>{
+            const opt=document.createElement('option');
+            opt.value=d.deviceId;
+            opt.textContent=d.label||`Speaker ${i+1}`;
+            outSel.appendChild(opt);
+          });
+          outSel.parentElement.style.display='block';
+        } else {
+          // Hide output selector if setSinkId not supported
+          outSel.parentElement.style.display='none';
+        }
+      }
+    }catch(e){console.warn('Device list error:',e);}
+
+    // Sync current values
+    const inputSl=$('settingsInputSlider'),inputV=$('settingsInputVal');
+    if(inputSl){inputSl.value=inputGainDb;if(inputV)inputV.textContent=fmtDb(inputGainDb);}
+    const outSl=$('settingsOutputSlider'),outV=$('settingsOutputVal');
+    if(outSl){outSl.value=masterOutputVolume;if(outV)outV.textContent=Math.round(masterOutputVolume*100)+'%';}
+    const nsCb=$('settingsNoiseSuppression');if(nsCb)nsCb.checked=noiseSuppression;
+    const ecCb=$('settingsEchoCancellation');if(ecCb)ecCb.checked=echoCancellation;
+  }
+
+  btn.addEventListener('click',()=>{
+    panel.style.display='flex';
+    populateDevices();
+  });
+  if(closeBtn)closeBtn.addEventListener('click',()=>{panel.style.display='none';});
+  panel.addEventListener('click',e=>{if(e.target===panel)panel.style.display='none';});
+
+  // Input gain
+  const inputSl=$('settingsInputSlider');
+  if(inputSl){
+    inputSl.addEventListener('input',()=>{
+      inputGainDb=parseFloat(inputSl.value);
+      const v=$('settingsInputVal');if(v)v.textContent=fmtDb(inputGainDb);
+      if(gainNode)gainNode.gain.value=dbToGain(inputGainDb);
+      if(guestGainNode)guestGainNode.gain.value=dbToGain(inputGainDb);
+      // Keep in-room sliders in sync
+      const hs=$('hostInputSlider');if(hs)hs.value=inputGainDb;
+      const hv=$('hostInputVal');if(hv)hv.textContent=fmtDb(inputGainDb);
+      const gi=$('guestInputSlider');if(gi)gi.value=inputGainDb;
+      const gv=$('guestInputVal');if(gv)gv.textContent=fmtDb(inputGainDb);
+    });
+  }
+
+  // Output volume
+  const outSl=$('settingsOutputSlider');
+  if(outSl){
+    outSl.addEventListener('input',()=>{
+      const val=parseFloat(outSl.value);
+      applyOutputVolume(val);
+      const v=$('settingsOutputVal');if(v)v.textContent=Math.round(val*100)+'%';
+    });
+  }
+
+  // Output device (Chrome only)
+  const outDev=$('settingsOutputSelect');
+  if(outDev){
+    outDev.addEventListener('change',async()=>{
+      const deviceId=outDev.value;
+      document.querySelectorAll('#audioElements audio').forEach(async a=>{
+        if(deviceId&&a.setSinkId){
+          try{await a.setSinkId(deviceId);}catch(e){console.warn('setSinkId failed:',e);}
+        }
+      });
+    });
+  }
+
+  // Mic change
+  const micSel=$('settingsMicSelect');
+  if(micSel){
+    micSel.addEventListener('change',async()=>{
+      currentMicId=micSel.value;
+      if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+      const newStream=await getMic();
+      if(isHost){
+        setupHostAudioGraph(newStream);
+        Object.entries(peers).forEach(([pid,p])=>{
+          if(!p.pending&&p.call){
+            try{
+              const sender=p.call.peerConnection&&p.call.peerConnection.getSenders().find(s=>s.track&&s.track.kind==='audio');
+              if(sender)sender.replaceTrack(newStream.getAudioTracks()[0]);
+            }catch(e){console.warn('replaceTrack error:',e);}
+          }
+        });
+      } else {
+        setupGuestAudioGraph(newStream);
+      }
+    });
+  }
+
+  // Noise suppression
+  const nsCb=$('settingsNoiseSuppression');
+  if(nsCb){
+    nsCb.addEventListener('change',async()=>{
+      noiseSuppression=nsCb.checked;
+      if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+      const s=await getMic();
+      if(isHost)setupHostAudioGraph(s);
+      else setupGuestAudioGraph(s);
+    });
+  }
+
+  // Echo cancellation
+  const ecCb=$('settingsEchoCancellation');
+  if(ecCb){
+    ecCb.addEventListener('change',async()=>{
+      echoCancellation=ecCb.checked;
+      if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+      const s=await getMic();
+      if(isHost)setupHostAudioGraph(s);
+      else setupGuestAudioGraph(s);
+    });
+  }
+
+  // In-panel mic test
+  const testBtn=$('settingsMicTestBtn');
+  if(testBtn){
+    testBtn.addEventListener('click',async()=>{
+      testBtn.disabled=true;
+      const res=$('settingsMicTestResult');
+      if(res)res.textContent='Recording…';
+      try{
+        const s=await navigator.mediaDevices.getUserMedia({audio:{deviceId:currentMicId?{exact:currentMicId}:undefined}});
+        const ctx=new AudioContext();
+        const dest=ctx.createMediaStreamDestination();
+        const src=ctx.createMediaStreamSource(s);
+        src.connect(dest);
+        const mr=new MediaRecorder(dest.stream);
+        const bufs=[];
+        mr.ondataavailable=e=>{if(e.data.size>0)bufs.push(e.data);};
+        mr.onstop=()=>{
+          s.getTracks().forEach(t=>t.stop());
+          const blob=new Blob(bufs,{type:mr.mimeType});
+          const url=URL.createObjectURL(blob);
+          const audio=new Audio(url);
+          audio.play();
+          if(res)res.textContent='▶ Playing back…';
+          audio.onended=()=>{URL.revokeObjectURL(url);if(res)res.textContent='✓ Done. If you heard yourself, your mic is working.';testBtn.disabled=false;};
+        };
+        mr.start();
+        setTimeout(()=>mr.stop(),5000);
+      }catch(e){
+        if(res)res.textContent='⚠ Could not access mic. Check permissions.';
+        testBtn.disabled=false;
+      }
     });
   }
 }
@@ -798,15 +1159,7 @@ function setupHostControls(){
       $('onAir').classList.add('visible');
     }
   });
-  ['m1','m2','m3','m4'].forEach(id=>{
-    const labels={m1:'Intro',m2:'Break',m3:'Outro',m4:'Clip'};
-    $(id).addEventListener('click',()=>{
-      if(!recording||paused)return;
-      const t=fmt(Math.floor(elapsed));
-      markers.push({label:labels[id],time:t});
-      $('markerLog').innerHTML=markers.map(mk=>`<span style="color:var(--text3)">${mk.label}</span>@<span style="color:var(--yellow)">${mk.time}</span>`).join(' · ');
-    });
-  });
+  $('hostSelfMuteBtn').addEventListener('click',toggleHostSelfMute);
   $('hostChatSend').addEventListener('click',()=>hostSendChat());
   $('hostChatInput').addEventListener('keydown',e=>{if(e.key==='Enter')hostSendChat();});
 }
@@ -845,7 +1198,7 @@ function setupGuestControls(){
   $('guestChatSend').addEventListener('click',()=>guestSendChat());
   $('guestChatInput').addEventListener('keydown',e=>{if(e.key==='Enter')guestSendChat();});
 
-  // Self-mute button for guest
+  // Self-mute
   const selfMuteBtn=$('guestSelfMuteBtn');
   if(selfMuteBtn){
     selfMuteBtn.addEventListener('click',()=>{
@@ -853,22 +1206,41 @@ function setupGuestControls(){
       const tracks=localStream.getAudioTracks();
       const currentlyMuted=tracks.length>0&&!tracks[0].enabled;
       tracks.forEach(t=>{t.enabled=currentlyMuted;});
-      updateGuestMuteUI(!currentlyMuted);
+      const nowMuted=!currentlyMuted;
+      updateGuestMuteUI(nowMuted);
+      const hostConn=peers['host']&&peers['host'].conn;
+      if(hostConn){try{hostConn.send({type:'self_muted',muted:nowMuted});}catch(e){}}
     });
   }
 
-  // Fallback download
-  const fallbackBtn=$('guestFallbackBtn');
-  if(fallbackBtn){
-    fallbackBtn.addEventListener('click',()=>{
-      if(guestBackupBlob){
-        const url=URL.createObjectURL(guestBackupBlob);
-        const a=document.createElement('a');
-        const safe=myName.replace(/[^a-zA-Z0-9]/g,'_');
-        const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-        a.href=url;a.download=`${safe}_backup_${ts}.mp3`;a.click();
-        URL.revokeObjectURL(url);
+  // Rejoin
+  const rejoinBtn=$('guestRejoinBtn');
+  if(rejoinBtn){
+    rejoinBtn.addEventListener('click',()=>{
+      rejoinBtn.style.display='none';
+      if(peer&&!peer.destroyed){
+        try{peer.reconnect();}catch(e){}
+      } else {
+        initPeer(`GUEST-${roomId}-${randId(4)}`);
       }
+    });
+  }
+
+  // Backup download — always available after recording starts
+  const backupBtn=$('guestBackupDownloadBtn');
+  if(backupBtn){
+    backupBtn.addEventListener('click',()=>{
+      if(!guestBackupBlob&&(!rawChunks||rawChunks.length===0)){
+        alert('No backup available yet. Start recording first.');return;
+      }
+      const blob=guestBackupBlob||new Blob(rawChunks,{type:'audio/webm'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      const safe=myName.replace(/[^a-zA-Z0-9]/g,'_');
+      const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+      const ext=guestBackupBlob?'mp3':'webm';
+      a.href=url;a.download=`${safe}_backup_${ts}.${ext}`;a.click();
+      URL.revokeObjectURL(url);
     });
   }
 }
@@ -894,16 +1266,16 @@ function startSession(){
 }
 
 function beginRecording(){
-  chunks=[];rawChunks=[];markers=[];
-  $('markerLog').textContent='';
+  chunks=[];rawChunks=[];
   recording=true;paused=false;elapsed=0;startTime=Date.now();
   timerInterval=setInterval(tickTimer,500);
-  // 60 min warning
+  // Time warnings
   setTimeout(()=>{if(recording){const w=$('sixtyMinWarning');if(w)w.style.display='flex';}},60*60*1000);
+  setTimeout(()=>{if(recording)hostSystemMsg('⚠ 90 minutes reached. Keep all screens active.');},90*60*1000);
+  setTimeout(()=>{if(recording)hostSystemMsg('⚠ 2 hours reached. Consider wrapping up soon.');},120*60*1000);
   $('recBtn').classList.add('recording');
   $('recBtn').innerHTML='<span class="rec-dot"></span> Stop Recording';
   $('pauseBtn').disabled=false;$('pauseBtn').textContent='⏸ Pause';
-  ['m1','m2','m3','m4'].forEach(id=>$(id).disabled=false);
   $('onAir').classList.add('visible');$('hostDurStatus').textContent='Recording';
   startLocalRecording();
   hostSystemMsg('Recording started.');
@@ -916,7 +1288,6 @@ function stopSession(){
   $('recBtn').classList.remove('recording');
   $('recBtn').innerHTML='<span class="rec-dot"></span> Record';
   $('pauseBtn').disabled=true;$('pauseBtn').textContent='⏸ Pause';
-  ['m1','m2','m3','m4'].forEach(id=>$(id).disabled=true);
   $('hostDurStatus').textContent='Finishing…';
   broadcastToGuests({type:'record_stop'});
   hostSystemMsg('Recording stopped. Collecting tracks…');
@@ -981,7 +1352,6 @@ function stopGuestRecording(hostConn){
   mediaRecorder.stop();
 }
 
-// ── Encode to MP3 then send ──
 async function encodeAndSend(hostConn){
   $('guestUploadCard').style.display='block';
   $('guestUploadPct').textContent='Encoding to MP3…';
@@ -1000,25 +1370,16 @@ async function encodeAndSend(hostConn){
     const decoded=await audioCtx.decodeAudioData(arrayBuffer);
     const mp3Blob=await encodeMp3(decoded,256);
 
-    if(!mp3Blob||mp3Blob.size===0){
-      throw new Error('MP3 encoding produced empty file');
-    }
+    if(!mp3Blob||mp3Blob.size===0){throw new Error('MP3 encoding produced empty file');}
 
     guestBackupBlob=mp3Blob;
-    // Show fallback button now we have the file
-    const fallbackBtn=$('guestFallbackBtn');
-    if(fallbackBtn)fallbackBtn.style.display='block';
-
     $('guestUploadPct').textContent='Sending…';
     sendFileToHost(hostConn,mp3Blob,'audio/mp3');
 
   }catch(err){
     console.error('Encode error:',err);
-    // Fall back to raw webm
     if(rawBlob.size>0){
       guestBackupBlob=rawBlob;
-      const fallbackBtn=$('guestFallbackBtn');
-      if(fallbackBtn)fallbackBtn.style.display='block';
       $('guestUploadPct').textContent='Sending raw audio…';
       sendFileToHost(hostConn,rawBlob,'audio/webm');
     } else {
@@ -1027,7 +1388,6 @@ async function encodeAndSend(hostConn){
   }
 }
 
-// ── MP3 encoder ──
 async function encodeMp3(audioBuffer,kbps){
   return new Promise((resolve,reject)=>{
     function doEncode(){
@@ -1061,37 +1421,27 @@ async function encodeMp3(audioBuffer,kbps){
   });
 }
 
-// ── File transfer with backpressure ──
 function sendFileToHost(hostConn,blob,mimeType){
-  const CHUNK=8192;
-  const BUFFER_HIGH=32768;
-  const BUFFER_LOW=8192;
+  const CHUNK=8192,BUFFER_HIGH=32768,BUFFER_LOW=8192;
   const totalChunks=Math.ceil(blob.size/CHUNK);
-
   if(peers['host'])peers['host'].transferring=true;
   hostConn.send({type:'file_meta',name:myName,totalChunks,size:blob.size,mimeType});
-
   let offset=0,sending=false,waitingBuf=false;
-
   const dc=hostConn.dataChannel||hostConn._dc;
   if(dc){
     dc.bufferedAmountLowThreshold=BUFFER_LOW;
     dc.addEventListener('bufferedamountlow',()=>{if(waitingBuf){waitingBuf=false;schedule();}});
   }
-
   function schedule(){setTimeout(next,8);}
-
   function next(){
     if(sending)return;
     if(offset>=blob.size){
-      // Wait for buffer to drain then send file_done
       function waitDrain(){
         if(dc&&dc.bufferedAmount>0){setTimeout(waitDrain,50);return;}
         hostConn.send({type:'file_done',name:myName});
         $('guestStatusDisplay').textContent='Sent — waiting for confirmation…';
       }
-      setTimeout(waitDrain,150);
-      return;
+      setTimeout(waitDrain,150);return;
     }
     if(dc&&dc.bufferedAmount>BUFFER_HIGH){waitingBuf=true;return;}
     sending=true;
@@ -1116,29 +1466,18 @@ function sendFileToHost(hostConn,blob,mimeType){
 
 function showGuestTransferFailed(msg){
   const c=$('guestUploadCard');if(c)c.style.display='none';
-  $('guestStatusDisplay').textContent='Transfer failed';
-  const card=document.createElement('div');
-  card.className='card';
-  card.style.cssText='margin-bottom:14px;border-color:rgba(255,59,59,0.3);background:var(--red-dim);';
-  card.innerHTML=`
-    <div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px;">⚠ Transfer failed</div>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">${msg||'Your track could not be sent to the host.'} Download your backup and send it via WeTransfer, Google Drive or email.</p>
-    <button class="btn btn-record btn-sm" id="guestFallbackBtnFailed">↓ Download my backup track</button>`;
-  const done=$('guestDoneCard');if(done)done.before(card);
-  const btn=document.getElementById('guestFallbackBtnFailed');
-  if(btn&&guestBackupBlob){
-    btn.addEventListener('click',()=>{
-      const url=URL.createObjectURL(guestBackupBlob);
-      const a=document.createElement('a');
-      const safe=myName.replace(/[^a-zA-Z0-9]/g,'_');
-      const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-      a.href=url;a.download=`${safe}_backup_${ts}.mp3`;a.click();
-      URL.revokeObjectURL(url);
-    });
+  $('guestStatusDisplay').textContent='Transfer failed — download your backup track';
+  // Show backup download button prominently
+  const backupBtn=$('guestBackupDownloadBtn');
+  if(backupBtn){
+    backupBtn.textContent='⚠ Download my backup track';
+    backupBtn.style.background='var(--yellow)';
+    backupBtn.style.color='#000';
+    backupBtn.style.borderColor='var(--yellow)';
   }
+  guestSystemMsg(`⚠ Transfer failed. ${msg||'Download your backup and send via WeTransfer or email.'}`);
 }
 
-// ── Transfer received ──
 function addTransferRow(peerId,name,size){
   const sizeMb=size?(size/1048576).toFixed(1)+' MB':'';
   const row=document.createElement('div');row.className='transfer-item';row.id=`trow-${peerId}`;
@@ -1157,36 +1496,23 @@ function updateTransferBar(peerId,pct){
 async function finaliseGuestTrack(peerId,conn){
   const p=peers[peerId];if(!p)return;
   if(peers[peerId])peers[peerId].transferring=false;
-
   const allChunks=receivedChunks[peerId];
   if(!allChunks||allChunks.length===0){
     conn.send({type:'transfer_failed'});
-    hostSystemMsg(`⚠ ${p.name}'s track arrived empty. Ask them to send their backup.`);
+    hostSystemMsg(`⚠ ${p.name}'s track arrived empty. Ask them to download their backup.`);
     return;
   }
-
   const meta=receivedMeta[peerId]||{};
   const mimeType=meta.mimeType||'audio/webm';
   const blob=new Blob(allChunks.map(c=>new Uint8Array(c)),{type:mimeType});
-
-  // Update UI to 100%
   const b=$(`tbar-${peerId}`);if(b){b.style.width='100%';b.style.background='var(--green)';}
   const e=$(`tpct-${peerId}`);if(e)e.innerHTML='<span class="transfer-done">✓</span>';
-
-  // Confirm to guest — NOW they see Done
   conn.send({type:'transfer_confirmed'});
-
   const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
   const safe=(p.name||'Guest').replace(/[^a-zA-Z0-9]/g,'_');
   const ext=mimeType.includes('mp3')||mimeType.includes('mpeg')?'mp3':'webm';
   const sizeMb=(blob.size/1048576).toFixed(1);
-
-  addDownload(
-    `${safe}_${ts}.${ext}`,
-    `${p.name} · ${ext.toUpperCase()} · ${sizeMb} MB`,
-    URL.createObjectURL(blob),
-    `${safe}_${ts}.${ext}`
-  );
+  addDownload(`${safe}_${ts}.${ext}`,`${p.name} · ${ext.toUpperCase()} · ${sizeMb} MB`,URL.createObjectURL(blob),`${safe}_${ts}.${ext}`);
   hostSystemMsg(`✓ ${p.name}'s track received (${sizeMb} MB).`);
   $('dlSection').style.display='block';
   checkAllDone();
@@ -1201,12 +1527,7 @@ async function buildHostDownload(){
     const mp3Blob=await encodeMp3(decoded,256);
     const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
     const safe=(myName||'Host').replace(/[^a-zA-Z0-9]/g,'_');
-    addDownload(
-      `${safe}_HOST_${ts}.mp3`,
-      `${myName} (Host) · MP3 256kbps · ${(mp3Blob.size/1048576).toFixed(1)} MB`,
-      URL.createObjectURL(mp3Blob),
-      `${safe}_HOST_${ts}.mp3`
-    );
+    addDownload(`${safe}_HOST_${ts}.mp3`,`${myName} (Host) · MP3 256kbps · ${(mp3Blob.size/1048576).toFixed(1)} MB`,URL.createObjectURL(mp3Blob),`${safe}_HOST_${ts}.mp3`);
     $('dlSection').style.display='block';
   }catch(e){
     console.error('Host encode error:',e);
@@ -1227,18 +1548,9 @@ function checkAllDone(){
   }
 }
 
-// ── Consent log ──
 function generateConsentLog(){
   const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-  const lines=[
-    'VOX5000 RECORDING CONSENT LOG','==============================',
-    `Room ID: ${roomId}`,
-    `Room Name: ${(getRooms()[roomId]||{}).name||'Interview Room'}`,
-    `Session date: ${new Date().toUTCString()}`,
-    `Log generated: ${tsNow()}`,'',
-    'This log documents participant consent for recording purposes.','',
-    'PARTICIPANTS','------------',''
-  ];
+  const lines=['VOX5000 RECORDING CONSENT LOG','==============================',`Room ID: ${roomId}`,`Room Name: ${(getRooms()[roomId]||{}).name||'Interview Room'}`,`Session date: ${new Date().toUTCString()}`,`Log generated: ${tsNow()}`,'','This log documents participant consent for recording purposes.','','PARTICIPANTS','------------',''];
   consentLog.forEach((entry,i)=>{
     lines.push(`Participant ${i+1}: ${entry.name}`);
     lines.push(`  Role:      ${entry.role}`);
@@ -1258,7 +1570,6 @@ function generateConsentLog(){
   hostSystemMsg('📋 Consent log ready.');
 }
 
-// ── Downloads ──
 function addDownload(name,meta,url,filename){
   $('dlSection').style.display='block';
   const item=document.createElement('div');item.className='dl-item';
@@ -1309,7 +1620,6 @@ function broadcastToGuests(data,excludePeer){
   });
 }
 
-// ── WAV encoder (for host format options later) ──
 function encodeWav(audioBuffer,bits){
   const ch=audioBuffer.getChannelData(0),n=ch.length,sr=audioBuffer.sampleRate;
   const bps=bits/8,byteRate=sr*bps,dataSize=n*bps;
@@ -1326,7 +1636,6 @@ function encodeWav(audioBuffer,bits){
   return new Blob([out],{type:'audio/wav'});
 }
 
-// ── Init ──
 setupNav();
 
 if(isHost&&roomId&&checkHostReturn()){
