@@ -199,9 +199,9 @@
 
 /* Participant rows */
 .participant-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) minmax(82px, auto) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: 12px;
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -226,7 +226,14 @@
   color: var(--yellow);
   flex-shrink: 0;
 }
-.participant-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.participant-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .participant-role { font-size: 11px; color: var(--text3); margin-top: 2px; }
 .participant-meter {
   flex: 1;
@@ -297,6 +304,16 @@
 }
 .btn-mute:hover { border-color: var(--red); color: var(--red); }
 .btn-mute.muted { background: var(--red-dim); border-color: rgba(255,59,59,0.35); color: var(--red); }
+.participant-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.participant-row.is-host {
+  grid-template-columns: 36px minmax(0, 1fr);
+}
 
 /* Waiting queue */
 .waiting-row {
@@ -457,6 +474,13 @@
   .screen-card { padding: 24px 20px; }
   .countdown-number { font-size: 72px; }
   .participant-vol { display: none; }
+  .participant-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .participant-row.is-host {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
 }
 
 /* ── Consent choice buttons ── */

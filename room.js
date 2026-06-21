@@ -85,6 +85,9 @@ let myName = '', myPeerId = '', myConsented = false, myIsObserver = false;
 let recording = false, paused = false, elapsed = 0, startTime, timerInterval;
 let mediaRecorder, chunks = [], rawChunks = [];
 let audioCtx, localStream, gainNode, processedDest, hostAnalyser, guestGainNode, guestAnalyser;
+let combinedDest, combinedRecorder, combinedChunks = [];
+const combinedSources = {};
+const remoteStreams = {};
 let peer;
 const peers = {}; // peerId → { conn, call, name, pending, consented, observer, muted, selfMuted, analyser }
 const receivedChunks = {}, receivedMeta = {};
@@ -557,6 +560,7 @@ function handleIncomingConn(conn) {
     if (data.type === 'guest_leaving') {
       const p = peers[conn.peer];
       hostSystemMsg(`${p ? p.name : 'A guest'} has left.`);
+      removeStreamFromCombinedMix(conn.peer);
       delete peers[conn.peer];
       renderParticipants();
       broadcastParticipantUpdate();
@@ -578,6 +582,7 @@ function handleIncomingConn(conn) {
       const wq = $('waitingQueue');
       if (wq && $('waitingList') && $('waitingList').children.length === 0) wq.style.display = 'none';
     }
+    removeStreamFromCombinedMix(conn.peer);
     delete peers[conn.peer];
     renderParticipants();
     broadcastParticipantUpdate();
@@ -684,6 +689,7 @@ window.denyGuest = function(peerId) {
   if (row) row.remove();
   const wl = $('waitingList');
   if (wl && wl.children.length === 0 && $('waitingQueue')) $('waitingQueue').style.display = 'none';
+  removeStreamFromCombinedMix(peerId);
   delete peers[peerId];
 };
 
@@ -696,6 +702,7 @@ window.kickGuest = function(peerId) {
     try { p.conn.close(); } catch(e) {}
     const audio = $(`audio-${peerId}`);
     if (audio) audio.remove();
+    removeStreamFromCombinedMix(peerId);
     delete peers[peerId];
     renderParticipants();
     broadcastParticipantUpdate();
@@ -775,6 +782,8 @@ function addRemoteAudio(peerId, remoteStream) {
     if (ae) ae.appendChild(a);
   }
   a.srcObject = remoteStream;
+  remoteStreams[peerId] = remoteStream;
+  if (isHost) addStreamToCombinedMix(peerId, remoteStream);
   // P9: cap at 100%
   a.volume = Math.min(1, Math.max(0, masterOutputVolume));
 }
@@ -783,6 +792,55 @@ function applyOutputVolume(vol) {
   // P9: cap at 1.0 — slider max should be 1.0 in HTML too
   masterOutputVolume = Math.min(1, Math.max(0, vol));
   document.querySelectorAll('#audioElements audio').forEach(a => { a.volume = masterOutputVolume; });
+}
+
+// ── Combined host mix ──
+// This records the live room mix as heard by the host, while separate tracks are
+// still recorded locally by each participant and transferred at the end.
+function addStreamToCombinedMix(id, stream) {
+  if (!recording || !combinedDest || !audioCtx || !stream) return;
+  if (combinedSources[id]) return;
+  if (!stream.getAudioTracks || stream.getAudioTracks().length === 0) return;
+  try {
+    const src = audioCtx.createMediaStreamSource(stream);
+    src.connect(combinedDest);
+    combinedSources[id] = src;
+  } catch(e) {
+    console.warn('Could not add stream to combined mix:', id, e);
+  }
+}
+
+function removeStreamFromCombinedMix(id) {
+  if (combinedSources[id]) {
+    try { combinedSources[id].disconnect(); } catch(e) {}
+    delete combinedSources[id];
+  }
+  delete remoteStreams[id];
+}
+
+function startCombinedRecording() {
+  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
+  combinedDest = audioCtx.createMediaStreamDestination();
+  combinedChunks = [];
+  Object.keys(combinedSources).forEach(k => delete combinedSources[k]);
+
+  if (processedDest) addStreamToCombinedMix('local', processedDest.stream);
+  Object.entries(remoteStreams).forEach(([id, stream]) => addStreamToCombinedMix(id, stream));
+
+  const opts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 320000 }
+    : { audioBitsPerSecond: 256000 };
+  combinedRecorder = new MediaRecorder(combinedDest.stream, opts);
+  combinedRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) combinedChunks.push(e.data); };
+  combinedRecorder.start(1000);
+}
+
+function stopCombinedRecording() {
+  return new Promise(resolve => {
+    if (!combinedRecorder || combinedRecorder.state === 'inactive') { resolve(); return; }
+    combinedRecorder.onstop = () => resolve();
+    combinedRecorder.stop();
+  });
 }
 
 // ── Remote analyser ──
@@ -1037,7 +1095,7 @@ function makeParticipantRow(pid, name, isHostUser, isMe, consented, observer, mu
   avatar.textContent = initials(name); // P5: textContent
 
   const info = document.createElement('div');
-  info.style.cssText = 'flex:1;min-width:0;';
+  info.className = 'participant-info';
 
   const nameEl = document.createElement('div');
   nameEl.className = 'participant-name';
@@ -1106,7 +1164,7 @@ function makeParticipantRow(pid, name, isHostUser, isMe, consented, observer, mu
   // Action buttons (not for self)
   if (!isMe && !isHostUser) {
     const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0;';
+    actions.className = 'participant-actions';
 
     const p = peers[pid] || {};
     const muteBtn = document.createElement('button');
@@ -1410,6 +1468,7 @@ function setupHostControls() {
     if (!paused) {
       paused = true;
       if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.pause();
+      if (combinedRecorder && combinedRecorder.state === 'recording') combinedRecorder.pause();
       broadcastToGuests({ type: 'record_pause' });
       pauseBtn.textContent = '▶ Resume';
       setText($('hostDurStatus'), 'Paused');
@@ -1418,6 +1477,7 @@ function setupHostControls() {
       paused = false;
       startTime = Date.now() - elapsed * 1000;
       if (mediaRecorder && mediaRecorder.state === 'paused') mediaRecorder.resume();
+      if (combinedRecorder && combinedRecorder.state === 'paused') combinedRecorder.resume();
       broadcastToGuests({ type: 'record_resume' });
       pauseBtn.textContent = '⏸ Pause';
       setText($('hostDurStatus'), 'Recording');
@@ -1658,6 +1718,7 @@ function beginRecording() {
 
   // P3: record processed stream, not raw mic
   startLocalRecording();
+  startCombinedRecording();
   // P8: disable mic changes during recording (settings panel handles this too)
   hostSystemMsg('Recording started.');
 }
@@ -1674,6 +1735,8 @@ function stopSession() {
   broadcastToGuests({ type: 'record_stop' });
   hostSystemMsg('Recording stopped. Collecting tracks…');
   stopLocalRecording(async () => {
+    await stopCombinedRecording();
+    await buildCombinedDownload();
     await buildHostDownload();
     generateConsentLog();
     const guests = Object.values(peers).filter(p => !p.pending && !p.observer);
@@ -1966,6 +2029,35 @@ async function buildHostDownload() {
       `${myName} (Host) · WebM Opus (fallback) · ${sizeMb} MB`,
       URL.createObjectURL(rawBlob),
       `${safe}_HOST_${ts}.webm`
+    );
+  }
+  if ($('dlSection')) $('dlSection').style.display = 'block';
+}
+
+async function buildCombinedDownload() {
+  if (!combinedChunks || combinedChunks.length === 0) return;
+  const rawBlob = new Blob(combinedChunks, { type: 'audio/webm' });
+  const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+
+  try {
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
+    const mp3Blob = await encodeMp3Room(decoded, 256);
+    const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
+    addDownloadItem(
+      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.mp3`,
+      `All participants live mix · MP3 256kbps · ${sizeMb} MB`,
+      URL.createObjectURL(mp3Blob),
+      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.mp3`
+    );
+  } catch(e) {
+    console.warn('Combined mix MP3 encode failed, offering WebM:', e);
+    const sizeMb = (rawBlob.size / 1048576).toFixed(1);
+    addDownloadItem(
+      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`,
+      `All participants live mix · WebM Opus (fallback) · ${sizeMb} MB`,
+      URL.createObjectURL(rawBlob),
+      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`
     );
   }
   if ($('dlSection')) $('dlSection').style.display = 'block';
