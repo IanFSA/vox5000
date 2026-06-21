@@ -258,12 +258,14 @@
   </div>
 
   <!-- ── GUEST WAITING ALERT ── -->
-  <div id="guestAlert" style="display:none;position:fixed;top:70px;right:20px;z-index:150;background:var(--bg2);border:2px solid var(--yellow);border-radius:var(--radius);padding:16px 20px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.6);" role="alert" aria-live="assertive">
-    <div style="font-size:14px;font-weight:700;color:var(--yellow);margin-bottom:6px;">⚡ Guest waiting</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;" id="guestAlertName"></div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn-admit" id="guestAlertAdmit">Admit now</button>
-      <button class="btn-deny" id="guestAlertDismiss">Dismiss</button>
+  <div id="guestAlert" class="guest-alert" style="display:none;" role="alert" aria-live="assertive">
+    <div class="guest-alert-card">
+      <div class="guest-alert-title">⚡ Guest waiting</div>
+      <div class="guest-alert-name" id="guestAlertName"></div>
+      <div class="guest-alert-actions">
+        <button class="btn-admit" id="guestAlertAdmit">Admit now</button>
+        <button class="btn-deny" id="guestAlertDismiss">Dismiss</button>
+      </div>
     </div>
   </div>
 

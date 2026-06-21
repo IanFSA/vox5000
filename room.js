@@ -645,18 +645,28 @@ function showWaitingGuest(peerId, name, consented, observer) {
   // Guest alert popup
   const alert = $('guestAlert');
   if (alert) {
+    alert.dataset.peerId = peerId;
     setText($('guestAlertName'), `${name} wants to join`);
-    alert.style.display = 'block';
+    alert.style.display = 'flex';
     const admBtn = $('guestAlertAdmit');
-    if (admBtn) admBtn.onclick = () => { alert.style.display = 'none'; admitGuest(peerId); };
+    if (admBtn) admBtn.onclick = () => { clearGuestWaitingAlert(peerId); admitGuest(peerId); };
     const disBtn = $('guestAlertDismiss');
-    if (disBtn) disBtn.onclick = () => { alert.style.display = 'none'; };
+    if (disBtn) disBtn.onclick = () => clearGuestWaitingAlert(peerId);
   }
+}
+
+function clearGuestWaitingAlert(peerId) {
+  const alert = $('guestAlert');
+  if (!alert) return;
+  if (peerId && alert.dataset.peerId && alert.dataset.peerId !== peerId) return;
+  alert.style.display = 'none';
+  alert.dataset.peerId = '';
 }
 
 window.admitGuest = function(peerId) {
   const p = peers[peerId];
   if (!p) return;
+  clearGuestWaitingAlert(peerId);
   p.pending = false;
   p.conn.send({ type: 'admitted' });
   getMic().then(s => {
@@ -684,6 +694,7 @@ window.admitGuest = function(peerId) {
 window.denyGuest = function(peerId) {
   const p = peers[peerId];
   if (!p) return;
+  clearGuestWaitingAlert(peerId);
   p.conn.send({ type: 'denied' });
   const row = $(`wait-${peerId}`);
   if (row) row.remove();
@@ -696,6 +707,7 @@ window.denyGuest = function(peerId) {
 window.kickGuest = function(peerId) {
   const p = peers[peerId];
   if (!p) return;
+  clearGuestWaitingAlert(peerId);
   if (!confirm(`Remove ${p.name} from the room?`)) return;
   p.conn.send({ type: 'kicked' });
   setTimeout(() => {
@@ -1105,9 +1117,9 @@ function makeParticipantRow(pid, name, isHostUser, isMe, consented, observer, mu
   const badgeEl = document.createElement('div');
   badgeEl.style.marginTop = '3px';
   const chip = document.createElement('span');
-  if (isHostUser) { chip.className = 'chip chip-ready'; chip.textContent = `${muted ? '🔇 ' : '🎙 '}Host${muted ? ' (Muted)' : ''}`; }
-  else if (observer) { chip.className = 'chip chip-observer'; chip.textContent = '👁 Observer'; }
-  else { chip.className = 'chip chip-consented'; chip.textContent = `${muted ? '🔇 ' : '🟢 '}Consented${muted ? ' · Muted' : ''}`; }
+  if (isHostUser) { chip.className = 'chip chip-ready'; chip.textContent = muted ? 'Host muted' : 'Host'; }
+  else if (observer) { chip.className = 'chip chip-observer'; chip.textContent = 'Observer'; }
+  else { chip.className = 'chip chip-consented'; chip.textContent = muted ? 'Muted' : 'Consented'; }
   badgeEl.appendChild(chip);
 
   const meter = document.createElement('div');
@@ -1997,7 +2009,7 @@ async function finaliseGuestTrack(peerId, conn) {
   const safe = (p.name || 'Guest').replace(/[^a-zA-Z0-9]/g, '_');
   const ext = mimeType.includes('mp3') || mimeType.includes('mpeg') ? 'mp3' : 'webm';
   const sizeMb = (blob.size / 1048576).toFixed(1);
-  addDownloadItem(`${safe}_${ts}.${ext}`, `${p.name} · ${ext.toUpperCase()} · ${sizeMb} MB`, URL.createObjectURL(blob), `${safe}_${ts}.${ext}`);
+  addDownloadItem(`${p.name || 'Guest'} track`, `${ext.toUpperCase()} · ${sizeMb} MB`, URL.createObjectURL(blob), `${safe}_${ts}.${ext}`);
   hostSystemMsg(`✓ ${p.name}'s track received (${sizeMb} MB).`);
   if ($('dlSection')) $('dlSection').style.display = 'block';
   checkAllDone();
@@ -2015,8 +2027,8 @@ async function buildHostDownload() {
     const mp3Blob = await encodeMp3Room(decoded, 256);
     const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
     addDownloadItem(
-      `${safe}_HOST_${ts}.mp3`,
-      `${myName} (Host) · MP3 256kbps · ${sizeMb} MB`,
+      'Host track',
+      `MP3 · ${sizeMb} MB`,
       URL.createObjectURL(mp3Blob),
       `${safe}_HOST_${ts}.mp3`
     );
@@ -2025,8 +2037,8 @@ async function buildHostDownload() {
     console.warn('Host MP3 encode failed, offering WebM:', e);
     const sizeMb = (rawBlob.size / 1048576).toFixed(1);
     addDownloadItem(
-      `${safe}_HOST_${ts}.webm`,
-      `${myName} (Host) · WebM Opus (fallback) · ${sizeMb} MB`,
+      'Host track',
+      `WebM · ${sizeMb} MB`,
       URL.createObjectURL(rawBlob),
       `${safe}_HOST_${ts}.webm`
     );
@@ -2045,8 +2057,8 @@ async function buildCombinedDownload() {
     const mp3Blob = await encodeMp3Room(decoded, 256);
     const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
     addDownloadItem(
-      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.mp3`,
-      `All participants live mix · MP3 256kbps · ${sizeMb} MB`,
+      'All participants mix',
+      `MP3 · ${sizeMb} MB`,
       URL.createObjectURL(mp3Blob),
       `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.mp3`
     );
@@ -2054,8 +2066,8 @@ async function buildCombinedDownload() {
     console.warn('Combined mix MP3 encode failed, offering WebM:', e);
     const sizeMb = (rawBlob.size / 1048576).toFixed(1);
     addDownloadItem(
-      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`,
-      `All participants live mix · WebM Opus (fallback) · ${sizeMb} MB`,
+      'All participants mix',
+      `WebM · ${sizeMb} MB`,
       URL.createObjectURL(rawBlob),
       `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`
     );

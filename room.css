@@ -234,6 +234,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.participant-info { min-width: 0; }
 .participant-role { font-size: 11px; color: var(--text3); margin-top: 2px; }
 .participant-meter {
   flex: 1;
@@ -313,6 +314,50 @@
 
 .participant-row.is-host {
   grid-template-columns: 36px minmax(0, 1fr);
+}
+
+.guest-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.guest-alert-card {
+  width: min(520px, calc(100vw - 40px));
+  background: var(--bg2);
+  border: 3px solid var(--yellow);
+  border-radius: 28px;
+  padding: 32px 40px;
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(223, 255, 0, 0.2);
+}
+
+.guest-alert-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--yellow);
+  margin-bottom: 14px;
+}
+
+.guest-alert-name {
+  font-size: 20px;
+  color: var(--text2);
+  margin-bottom: 24px;
+}
+
+.guest-alert-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.guest-alert-actions button {
+  min-width: 150px;
+  font-size: 18px;
+  padding: 14px 24px;
 }
 
 /* Waiting queue */
@@ -480,6 +525,16 @@
   }
   .participant-row.is-host {
     grid-template-columns: 36px minmax(0, 1fr);
+  }
+  .guest-alert-card {
+    padding: 26px 22px;
+    border-radius: 22px;
+  }
+  .guest-alert-title { font-size: 21px; }
+  .guest-alert-name { font-size: 18px; }
+  .guest-alert-actions button {
+    flex: 1 1 100%;
+    min-width: 0;
   }
 }
 
