@@ -130,25 +130,16 @@ body {
   gap: 16px;
 }
 
-/* ── Desktop: two-column layout for recorder ── */
+/* ── Desktop: widen the content comfortably ── */
 @media (min-width: 1024px) {
   .main {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    grid-template-rows: auto;
-    align-items: start;
-    column-gap: 32px;
+    padding: 56px 80px 120px;
   }
-  .hero            { grid-column: 1 / -1; }
-  .mode-cards      { grid-column: 1 / -1; }
-  .section-divider { grid-column: 1 / -1; }
-  .notice-bar      { grid-column: 1 / -1; }
-  .recorder-card   { grid-column: 1 / 2; }
-  .waveform-section { grid-column: 1 / 2; }
-  .setup-footer    { grid-column: 1 / 2; }
-  .downloads       { grid-column: 1 / -1; }
-  .how-it-works    { grid-column: 2 / 3; grid-row: 3 / 6; }
-  .tips-section    { grid-column: 2 / 3; }
+  .hero-title { font-size: 52px; }
+  .mode-cards { grid-template-columns: 1fr 1fr; gap: 20px; }
+  .how-it-works, .tips-section {
+    max-width: 760px;
+  }
 }
 
 /* ── Hero ── */
