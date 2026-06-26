@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Rooms — Vox5000</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+  <header class="header" role="banner">
+    <div class="header-inner">
+      <div class="logo"><a href="/" aria-label="Vox5000 home"><span class="logo-text">VOX<span>5000</span></span></a></div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/rooms.html" class="nav-link nav-active" aria-current="page">My Rooms</a>
+        <a href="/help.html" class="nav-link">Help</a>
+      </nav>
+      <a href="/room.html" class="nav-cta">Create room</a>
+    </div>
+  </header>
+
+  <main class="main" id="main-content">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:4px;">
+      <div>
+        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:8px;">Your interview rooms</h1>
+        <p style="font-size:15px;color:var(--text2);max-width:520px;line-height:1.65;">Rooms are stored in this browser. Open a room to rejoin as host, or copy the guest invite link to share.</p>
+      </div>
+      <a href="/room.html" class="btn btn-record" style="text-decoration:none;align-self:flex-start;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Create new room
+      </a>
+    </div>
+
+    <div class="notice-bar" role="note">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+      <span>Rooms are saved in <strong>this browser only</strong>. They will not appear on other devices or browsers. Clearing browser data may remove them.</span>
+    </div>
+
+    <div id="roomsList" aria-live="polite" aria-label="Your rooms"></div>
+
+    <div id="noRooms" style="display:none;">
+      <div class="card" style="text-align:center;padding:52px 24px;">
+        <div style="font-size:40px;margin-bottom:20px;" aria-hidden="true">🎙</div>
+        <h2 style="font-size:19px;font-weight:700;color:var(--text);margin-bottom:10px;">No rooms yet</h2>
+        <p style="font-size:14px;color:var(--text2);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.65;">Create a room and send the invite link to your guest. Each person records locally. You download separate tracks when done.</p>
+        <a href="/room.html" class="btn btn-record" style="text-decoration:none;display:inline-flex;">Create your first room</a>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer-inner">
+      <span>© 2026 Vox5000</span>
+      <a href="privacy.html" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
+    </div>
+  </footer>
+
+  <script>
+    // ── Safe text helper — never insert user content via innerHTML ──
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function getRooms() {
+      try { return JSON.parse(localStorage.getItem('vox5000_rooms') || '{}'); } catch { return {}; }
+    }
+    function saveRooms(r) { localStorage.setItem('vox5000_rooms', JSON.stringify(r)); }
+
+    function buildGuestInviteMessage(url) {
+      return `Hi, you're being invited to record on VOX5000.
+
+Please read this before joining the recording room so we get the best possible sound.
+
+Room link:
+${url}
+
+BEST BROWSER
+Please open the link in Google Chrome.
+
+VOX5000 works best when everyone opens the room link in Chrome, whether you are using a computer, Android phone, or iPhone.
+
+IF YOU ARE USING A COMPUTER
+- Use Google Chrome on your laptop or desktop
+- Close any apps you do not need
+- Plug in your microphone or headset if you have one
+- Choose a quiet room
+- Keep your computer awake during the session
+- Allow microphone access when Chrome asks
+
+IF YOU ARE USING AN ANDROID PHONE
+- Use Google Chrome
+- Keep your phone charged
+- Use Wi-Fi or strong mobile data
+- Turn off battery saver if possible
+- Keep Chrome open during the session
+- Allow microphone access when Chrome asks
+
+IF YOU ARE USING AN IPHONE
+- Use Google Chrome on your iPhone
+- Open the room link in Chrome
+- Keep your phone charged
+- Use Wi-Fi or strong mobile data
+- Keep Chrome open during the session
+- Do not lock the phone while recording
+- Allow microphone access when Chrome asks
+
+HEADPHONES OR SPEAKERS
+Headphones or earphones are recommended because they reduce echo and feedback.
+
+Wired headphones are best. Bluetooth can work, but may sometimes add delay or reduce sound quality.
+
+If you do not have headphones, you can still join. Please keep your speaker volume low, stay in a quiet room, and avoid placing the device too close to another speaker.
+
+MICROPHONE
+Use the best microphone you have. A USB mic, headset mic, earphones mic, or your device's built-in mic can all work.
+
+For best results:
+- Sit close to the microphone
+- Keep a steady distance from it
+- Avoid tapping the desk or phone
+- Close windows and doors
+- Switch off fans, TV, music, or noisy appliances if possible
+
+BEFORE WE START
+- Open the room link in Google Chrome
+- Enter your name
+- Allow microphone access when Chrome asks
+- Choose "Yes — record me" if you agree to be recorded
+
+AUDIO SETTINGS
+At the top right of the room, click Audio Settings.
+
+There you can:
+- Choose the correct microphone
+- Test your mic for 5 seconds
+- Adjust your input level
+- Choose your speaker or headphone output
+- Turn noise suppression or echo cancellation on or off if needed
+
+If you are using headphones, echo cancellation is usually best left off for cleaner voice quality.
+
+If you are using speakers, echo cancellation may help reduce echo.
+
+DURING RECORDING
+- Keep Chrome open
+- Do not close the tab
+- Do not lock your phone or computer
+- Stay connected to stable Wi-Fi or mobile data
+- Wait for the host to stop the recording
+
+AFTER RECORDING
+When we stop, VOX5000 sends your local recording track to the host.
+
+Please wait until the screen confirms the track has been received.
+
+If transfer fails, use the backup download button and send the backup file manually.
+
+PRIVACY
+Your audio is recorded in your browser.
+
+VOX5000 does not store your recording on its servers.
+
+In interview rooms, your track is transferred to the host so they can download it.`;
+    }
+
+    function render() {
+      const rooms = getRooms();
+      const list = document.getElementById('roomsList');
+      const none = document.getElementById('noRooms');
+      const keys = Object.keys(rooms);
+
+      if (keys.length === 0) { list.innerHTML = ''; none.style.display = 'block'; return; }
+      none.style.display = 'none';
+      list.innerHTML = '';
+
+      keys.forEach(id => {
+        const r = rooms[id];
+        const date = r.created
+          ? new Date(r.created).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
+          : 'Unknown';
+
+        // Build card with DOM methods to prevent injection
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '10px';
+
+        const inner = document.createElement('div');
+        inner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;';
+
+        // Left: name + code + date
+        const left = document.createElement('div');
+
+        const nameEl = document.createElement('div');
+        nameEl.style.cssText = 'font-size:16px;font-weight:700;color:var(--text);margin-bottom:5px;';
+        nameEl.textContent = r.name || 'Interview Room'; // textContent is safe
+
+        const meta = document.createElement('div');
+        meta.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+        const codeEl = document.createElement('span');
+        codeEl.style.cssText = 'font-family:var(--mono);font-size:11px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-border);padding:2px 9px;border-radius:4px;';
+        codeEl.textContent = id; // room codes are generated alphanumeric — still use textContent
+
+        const dateEl = document.createElement('span');
+        dateEl.style.cssText = 'font-size:12px;color:var(--text3);';
+        dateEl.textContent = 'Created ' + date;
+
+        meta.appendChild(codeEl);
+        meta.appendChild(dateEl);
+        left.appendChild(nameEl);
+        left.appendChild(meta);
+
+        // Right: action buttons
+        const right = document.createElement('div');
+        right.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+
+        // Host reopening is based on this browser's saved local room ownership.
+        // Guest invite links use the same URL shape, but guests do not have the
+        // local owner record, so they enter guest mode.
+        const openBtn = document.createElement('a');
+        openBtn.href = `room.html?r=${encodeURIComponent(id)}`;
+        openBtn.className = 'btn btn-record btn-sm';
+        openBtn.style.textDecoration = 'none';
+        openBtn.textContent = 'Open as host';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-ghost btn-sm';
+        copyBtn.textContent = '📋 Copy full invite';
+        copyBtn.addEventListener('click', () => copyGuestLink(id));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-ghost btn-sm';
+        delBtn.style.cssText = 'color:var(--red);border-color:rgba(255,59,59,0.25);';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteRoom(id));
+
+        right.appendChild(openBtn);
+        right.appendChild(copyBtn);
+        right.appendChild(delBtn);
+
+        inner.appendChild(left);
+        inner.appendChild(right);
+        card.appendChild(inner);
+        list.appendChild(card);
+      });
+    }
+
+    function deleteRoom(id) {
+      if (confirm('Delete this room? This cannot be undone.')) {
+        const r = getRooms();
+        delete r[id];
+        saveRooms(r);
+        render();
+      }
+    }
+
+    // Guest invite link — opens as guest unless this same browser owns the room
+    function copyGuestLink(id) {
+      const url = `${location.origin}/room.html?r=${encodeURIComponent(id)}`;
+      const msg = buildGuestInviteMessage(url);
+      navigator.clipboard.writeText(msg).then(() => {
+        alert('Full guest invite copied!\n\nSend this to your guest. Do not use this link yourself — open the room using the "Open as host" button instead.');
+      }).catch(() => {
+        prompt('Copy this guest invite:', msg);
+      });
+    }
+
+    render();
+  </script>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="footer-logo">VOX<span>5000</span></div>
+      <p class="footer-note">Solo recordings never leave your device · Interview audio is peer to peer</p>
+      <ul class="footer-links">
+        <li><a href="/help.html">Help</a></li>
+        <li><a href="/privacy.html">Privacy</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>

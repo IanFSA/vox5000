@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Vox5000 solo recorder. Broadcast quality audio in your browser. No install, no account.">
+<title>Record — Vox5000</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #f5f5f7;
+  --white:       #ffffff;
+  --border:      #d2d2d7;
+  --muted:       #6e6e73;
+  --body:        #3a3a3c;
+  --heading:     #1d1d1f;
+  --green:       #0a8a5c;
+  --green-hi:    #0dab73;
+  --green-light: #e6f7f1;
+  --red:         #e03c3c;
+  --amber:       #c9780a;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--body);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  background: rgba(245,245,247,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--heading);
+  text-decoration: none;
+}
+.nav-logo span { color: var(--green); }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-links a:hover { color: var(--heading); }
+
+.nav-cta {
+  background: var(--heading) !important;
+  color: var(--white) !important;
+  padding: 8px 20px;
+  border-radius: 980px;
+  font-weight: 500 !important;
+  transition: background 0.2s !important;
+}
+
+.nav-cta:hover { background: var(--green) !important; }
+
+/* ── PAGE ── */
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 84px 40px 80px;
+}
+
+.page-header {
+  margin-bottom: 40px;
+}
+
+.page-label {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 16px;
+}
+
+.card-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* ── NOTICES ── */
+.notice {
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.notice-warn {
+  background: #fff8e6;
+  border: 1px solid #f0d080;
+  color: var(--amber);
+}
+
+.notice-error {
+  background: #fff0f0;
+  border: 1px solid #f0c0c0;
+  color: var(--red);
+}
+
+.notice-info {
+  background: var(--green-light);
+  border: 1px solid rgba(10,138,92,0.2);
+  color: var(--green);
+}
+
+/* ── INPUT CONTROLS ── */
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+select {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  color: var(--heading);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+select:focus { border-color: var(--green); }
+select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── SLIDER ── */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.slider-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+input[type=range] {
+  flex: 1;
+  accent-color: var(--green);
+  height: 4px;
+  cursor: pointer;
+}
+
+.slider-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading);
+  min-width: 52px;
+  text-align: right;
+}
+
+/* ── WAVEFORM ── */
+.waveform-wrap {
+  background: #0e0e0e;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+#waveCanvas {
+  width: 100%;
+  height: 100px;
+  display: block;
+}
+
+.clip-warn {
+  display: none;
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--red);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── METER ── */
+.meter-wrap {
+  margin-bottom: 6px;
+}
+
+.meter-bar-track {
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+#meterBar {
+  height: 100%;
+  width: var(--level, 0%);
+  background: linear-gradient(to right, var(--green) 0%, var(--green) 70%, var(--amber) 85%, var(--red) 100%);
+  border-radius: 4px;
+  transition: width 0.05s;
+}
+
+.meter-peaks {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+/* ── TIMER ── */
+.timer-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.duration {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--heading);
+  letter-spacing: -0.02em;
+}
+
+.dur-status {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.on-air {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(224,60,60,0.08);
+  border: 1px solid rgba(224,60,60,0.25);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.on-air.visible { display: flex; }
+
+.on-air-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── BUTTONS ── */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 22px;
+  border-radius: 980px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+}
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+.btn-record {
+  background: var(--heading);
+  color: var(--white);
+}
+
+.btn-record:hover:not(:disabled) { background: var(--green); transform: translateY(-1px); }
+
+.btn-record.recording {
+  background: var(--red);
+}
+
+.btn-record.recording:hover:not(:disabled) { background: #c02020; }
+
+.btn-ghost {
+  background: var(--bg);
+  color: var(--body);
+  border: 1.5px solid var(--border);
+}
+
+.btn-ghost:hover:not(:disabled) { border-color: var(--body); background: var(--white); }
+
+.btn-sm { font-size: 13px; padding: 8px 16px; }
+
+.rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── MARKERS ── */
+.marker-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.marker-log {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 20px;
+  margin-top: 6px;
+}
+
+/* ── DOWNLOADS ── */
+#dlSection {
+  display: none;
+}
+
+#dlSection.visible {
+  display: block;
+}
+
+.dl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.dl-item:last-child { border-bottom: none; }
+
+.dl-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.dl-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.dl-btn {
+  background: var(--heading);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 980px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.dl-btn:hover { background: var(--green); }
+
+/* ── FOOTER ── */
+footer { background: var(--heading); margin-top: 60px; }
+
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #ffffff;
+}
+
+.footer-logo span { color: var(--green-hi); }
+.footer-note { font-size: 13px; color: #c0c0c8; }
+.footer-links { display: flex; gap: 24px; list-style: none; }
+
+.footer-links a {
+  font-size: 13px;
+  color: #c0c0c8;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-links a:hover { color: #ffffff; }
+
+@media (max-width: 680px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .page { padding: 76px 20px 60px; }
+  .footer-inner { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">VOX<span>5000</span></a>
+  <ul class="nav-links">
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/#about">About</a></li>
+    <li><a href="/#different">Why Vox5000</a></li>
+    <li><a href="/#newsletter">Newsletter</a></li>
+    <li><a href="/room.html" class="nav-cta">Create interview room →</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-label">Solo Recorder</div>
+    <div class="page-title">Record yourself</div>
+  </div>
+
+  <!-- Notices -->
+  <div id="permNotice" class="notice notice-info" style="display:block;">
+    Allow microphone access when your browser asks, then select your mic below.
+  </div>
+  <div id="micDeniedError" class="notice notice-error">
+    🚫 Microphone access denied. Click the lock icon in your browser address bar, choose Allow, then refresh.
+  </div>
+  <div id="micNotFoundError" class="notice notice-error">
+    🎤 No microphone found. Make sure your USB or XLR interface mic is plugged in, then refresh.
+  </div>
+  <div id="unsupportedBrowser" class="notice notice-warn"></div>
+
+  <!-- Input & Format -->
+  <div class="card" id="soloRecorder" style="display:block;">
+    <div class="card-label">Input & Format</div>
+
+    <div class="control-row">
+      <span class="control-label">Mic</span>
+      <select id="micSelect"><option>Waiting for mic access…</option></select>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">Format</span>
+      <select id="formatSelect">
+        <option value="mp3">MP3 — compressed, great for delivery</option>
+        <option value="wav">WAV export — converted from recorded audio</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">Quality</span>
+      <select id="qualitySelect"></select>
+    </div>
+
+    <div style="margin-top:8px;">
+      <button class="btn btn-ghost btn-sm" id="testBtn">5s mic test</button>
+      <span style="font-size:12px;color:var(--muted);margin-left:10px;">Records and plays back to check your level and sound</span>
+    </div>
+  </div>
+
+  <!-- Timer & Record -->
+  <div class="card">
+    <div class="timer-row">
+      <span class="duration" id="duration">00:00:00.0</span>
+      <span class="dur-status" id="durStatus">Ready to record</span>
+      <div class="on-air" id="onAir" aria-live="assertive">
+        <span class="on-air-dot" aria-hidden="true"></span>
+        ON AIR
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-record" id="recBtn">
+        <span class="rec-dot"></span> Record
+      </button>
+      <button class="btn btn-ghost" id="pauseBtn" disabled>⏸ Pause</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);" id="sizeDisplay"></div>
+  </div>
+
+  <!-- Waveform -->
+  <div class="card" style="padding:20px;">
+    <div class="card-label">Waveform Monitor <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">Scrolls during recording · Red = clipping</span></div>
+    <div class="waveform-wrap">
+      <canvas id="waveCanvas" height="100" aria-hidden="true"></canvas>
+      <div class="clip-warn" id="clipWarn">Clipping</div>
+    </div>
+    <div class="meter-wrap">
+      <div class="meter-bar-track"><div id="meterBar"></div></div>
+      <div class="meter-peaks"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;display:flex;gap:16px;">
+      <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
+      <span style="color:var(--red);">● Clipping: above –6 dB</span>
+    </div>
+  </div>
+
+  <!-- Audio Settings -->
+  <div class="card">
+    <div class="card-label">Audio Settings</div>
+
+    <div class="slider-row">
+      <span class="slider-label">Input Gain</span>
+      <input type="range" id="inputGainSlider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain">
+      <span class="slider-val" id="inputGainVal">0 dB</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;padding-left:92px;">How loud your mic is recorded · Double-click to reset</div>
+
+    <div class="slider-row">
+      <span class="slider-label">Monitor</span>
+      <input type="range" id="monitorSlider" min="-60" max="0" step="1" value="-60" aria-label="Monitor volume">
+      <span class="slider-val" id="monitorVal">Off</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);padding-left:92px;">What you hear in headphones — does not affect recording</div>
+  </div>
+
+  <!-- Markers -->
+  <div class="card">
+    <div class="card-label">Markers</div>
+    <div class="marker-row">
+      <button class="btn btn-ghost btn-sm" onclick="addMarker('Intro')">Intro</button>
+      <button class="btn btn-ghost btn-sm" onclick="addMarker('Break')">Break</button>
+      <button class="btn btn-ghost btn-sm" onclick="addMarker('Outro')">Outro</button>
+      <button class="btn btn-ghost btn-sm" onclick="addMarker('Clip')">Clip</button>
+    </div>
+    <div class="marker-log" id="markerLog"></div>
+  </div>
+
+  <!-- Downloads -->
+  <div class="card" id="dlSection">
+    <div class="card-label">Downloads Ready</div>
+    <div id="dlGrid"></div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">VOX<span>5000</span></div>
+    <p class="footer-note">Solo recordings never leave your device · Interview audio is peer to peer</p>
+    <ul class="footer-links">
+      <li><a href="/help.html">Help</a></li>
+      <li><a href="/privacy.html">Privacy</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+// Marker functionality
+const markers = [];
+function addMarker(label) {
+  const dur = document.getElementById('duration');
+  const time = dur ? dur.textContent : '00:00:00.0';
+  markers.push({ label, time });
+  const log = document.getElementById('markerLog');
+  if (log) log.textContent = markers.map(m => `${m.time} — ${m.label}`).join(' | ');
+}
+</script>
+<script src="app.js"></script>
+</body>
+</html>
