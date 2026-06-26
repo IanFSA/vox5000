@@ -1,236 +1,543 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Help — Vox5000</title>
-  <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
-  <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>
-  <style>
-    .help-main{max-width:1400px;margin:0 auto;padding:48px 40px 100px;}
-    @media(max-width:600px){.help-main{padding:32px 16px 80px;}}
-    @media(max-width:1023px) and (min-width:601px){.help-main{padding:40px 24px 100px;}}
-    .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px;}
-    @media(min-width:1024px){.help-grid{grid-template-columns:1fr 1fr 1fr;}}
-    @media(max-width:600px){.help-grid{grid-template-columns:1fr;}}
-    .help-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:22px;}
-    .help-card h2{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;}
-    .help-card p{font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:8px;}
-    .help-card ul{list-style:none;display:flex;flex-direction:column;gap:7px;}
-    .help-card ul li{font-size:13px;color:var(--text2);padding-left:16px;position:relative;line-height:1.55;}
-    .help-card ul li::before{content:'—';position:absolute;left:0;color:var(--text3);}
-    .help-card-full{grid-column:1/-1;}
-    .checklist-card{background:linear-gradient(135deg,rgba(223,255,0,0.06) 0%,var(--bg2) 100%);border:1px solid var(--yellow-border);}
-    .checklist-item{display:flex;align-items:flex-start;gap:12px;font-size:14px;color:var(--text2);padding:10px 0;border-bottom:1px solid var(--border);}
-    .checklist-item:last-child{border-bottom:none;padding-bottom:0;}
-    .checklist-num{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-    .trouble-item{border-bottom:1px solid var(--border);padding:14px 0;}
-    .trouble-item:first-child{padding-top:0;}
-    .trouble-item:last-child{border-bottom:none;padding-bottom:0;}
-    .trouble-q{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;}
-    .trouble-a{font-size:13px;color:var(--text2);line-height:1.65;}
-    .help-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:28px;}
-    .help-nav a{font-size:12px;color:var(--text2);text-decoration:none;padding:5px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;transition:all 0.15s;}
-    .help-nav a:hover{color:var(--yellow);border-color:var(--yellow-border);}
-    h1{font-size:26px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:6px;}
-    .browser-alert{background:rgba(223,255,0,0.06);border:1px solid var(--yellow-border);border-radius:var(--radius);padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--text2);}
-    .browser-alert strong{color:var(--yellow);}
-    .honesty-note{background:rgba(255,59,59,0.06);border:1px solid rgba(255,59,59,0.2);border-radius:var(--radius);padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--text2);}
-    .honesty-note strong{color:var(--red);}
-    hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Vox5000 help guide. Everything you need to get the best out of your broadcast audio recorder.">
+<title>Help — Vox5000</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #f5f5f7;
+  --white:       #ffffff;
+  --border:      #d2d2d7;
+  --muted:       #6e6e73;
+  --body:        #3a3a3c;
+  --heading:     #1d1d1f;
+  --green:       #0a8a5c;
+  --green-hi:    #0dab73;
+  --green-light: #e6f7f1;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--body);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  background: rgba(245,245,247,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--heading);
+  text-decoration: none;
+}
+.nav-logo span { color: var(--green); }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-links a:hover { color: var(--heading); }
+
+.nav-cta {
+  background: var(--heading) !important;
+  color: var(--white) !important;
+  padding: 8px 20px;
+  border-radius: 980px;
+  font-weight: 500 !important;
+  transition: background 0.2s !important;
+}
+
+.nav-cta:hover { background: var(--green) !important; }
+
+/* ── PAGE HEADER ── */
+.page-header {
+  background: var(--white);
+  padding: 100px 40px 60px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-header-inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-label {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+
+.page-header h1 {
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+
+.page-header p {
+  font-size: 18px;
+  color: var(--muted);
+  line-height: 1.65;
+  max-width: 540px;
+}
+
+/* ── QUICK LINKS ── */
+.quick-links {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+}
+
+.quick-links-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.quick-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--green);
+  text-decoration: none;
+  padding: 16px 20px 16px 0;
+  margin-right: 20px;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.15s;
+  white-space: nowrap;
+}
+
+.quick-link:hover { border-bottom-color: var(--green); }
+
+/* ── CONTENT ── */
+.content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 60px 40px 80px;
+}
+
+.help-section {
+  margin-bottom: 56px;
+  padding-bottom: 56px;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.help-section-icon {
+  font-size: 28px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.help-section h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
+.help-section p {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 14px;
+}
+
+.help-section p:last-child { margin-bottom: 0; }
+
+.help-section p strong { color: var(--body); font-weight: 600; }
+
+/* Checklist steps */
+.steps {
+  list-style: none;
+  margin-top: 4px;
+}
+
+.steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  color: var(--body);
+  line-height: 1.6;
+}
+
+.steps li:last-child { border-bottom: none; }
+
+.step-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--white);
+  background: var(--green);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Warning / info box */
+.info-box {
+  background: var(--green-light);
+  border: 1px solid rgba(10,138,92,0.2);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+  font-size: 15px;
+  color: var(--body);
+  line-height: 1.65;
+}
+
+.info-box strong { color: var(--green); font-weight: 600; }
+
+/* Troubleshooting items */
+.trouble-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 12px;
+}
+
+.trouble-item h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 8px;
+}
+
+.trouble-item p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 0;
+}
+
+/* Format table */
+.format-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.format-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.format-table td {
+  font-size: 14px;
+  color: var(--body);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+  vertical-align: top;
+}
+
+.format-table tr:last-child td { border-bottom: none; }
+.format-table td:first-child {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  color: var(--heading);
+  white-space: nowrap;
+}
+
+/* ── FOOTER ── */
+footer { background: var(--heading); }
+
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #ffffff;
+}
+
+.footer-logo span { color: var(--green-hi); }
+.footer-note { font-size: 13px; color: #c0c0c8; }
+
+.footer-links { display: flex; gap: 24px; list-style: none; }
+
+.footer-links a {
+  font-size: 13px;
+  color: #c0c0c8;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-links a:hover { color: #ffffff; }
+
+@media (max-width: 760px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .page-header { padding: 88px 20px 48px; }
+  .quick-links { padding: 0 20px; }
+  .content { padding: 40px 20px 60px; }
+  .footer-inner { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
+}
+</style>
 </head>
 <body>
-  <header class="header" role="banner">
-    <div class="header-inner">
-      <div class="logo"><a href="index.html" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
-      <nav class="main-nav" aria-label="Main navigation">
-        <a href="index.html" class="nav-link">Home</a>
-        <a href="rooms.html" class="nav-link">My Rooms</a>
-        <a href="help.html" class="nav-link nav-active" aria-current="page">Help</a>
-      </nav>
-      <a href="room.html" class="nav-cta">Create room</a>
-    </div>
-  </header>
 
-  <main class="help-main" id="main-content">
+<nav>
+  <a href="https://www.vox5000.com" class="nav-logo">VOX<span>5000</span></a>
+  <ul class="nav-links">
+    <li><a href="https://www.vox5000.com#features">Features</a></li>
+    <li><a href="https://www.vox5000.com#about">About</a></li>
+    <li><a href="https://www.vox5000.com#different">Why Vox5000</a></li>
+    <li><a href="https://www.vox5000.com#newsletter">Newsletter</a></li>
+    <li><a href="https://www.vox5000.com/index.html" class="nav-cta">Open recorder →</a></li>
+  </ul>
+</nav>
 
-    <h1>Help & Guide</h1>
-    <p style="font-size:15px;color:var(--text2);margin-bottom:24px;">Everything you need to get the best out of Vox5000.</p>
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-label">Help</div>
+    <h1>Everything you need to get started.</h1>
+    <p>A full guide to solo recording, interview rooms, guest setup, audio quality, and troubleshooting.</p>
+  </div>
+</div>
 
-    <div class="browser-alert">
-      <strong>⚠ Use Google Chrome on a desktop or laptop.</strong> Mobile Safari and Firefox have limited support for the Web Audio and recording APIs that Vox5000 depends on. Chrome desktop gives the most reliable experience.
-    </div>
+<div class="quick-links">
+  <div class="quick-links-inner">
+    <a href="#before" class="quick-link">Before you record</a>
+    <a href="#solo" class="quick-link">Solo recording</a>
+    <a href="#hosting" class="quick-link">Hosting an interview</a>
+    <a href="#guest" class="quick-link">Joining as a guest</a>
+    <a href="#quality" class="quick-link">Audio quality</a>
+    <a href="#formats" class="quick-link">File formats</a>
+    <a href="#troubleshooting" class="quick-link">Troubleshooting</a>
+  </div>
+</div>
 
-    <div class="honesty-note">
-      <strong>About audio quality:</strong> Vox5000 records using your browser's built-in WebM Opus codec. The WAV export option converts this recording to WAV format — it is not a true uncompressed PCM capture. For broadcast delivery, MP3 320 kbps or the WebM file both work well. If you need true lossless capture, record directly into your DAW using an audio interface.
-    </div>
+<div class="content">
 
-    <nav class="help-nav" aria-label="Jump to section">
-      <a href="#quickstart">Quick start</a>
-      <a href="#solo">Solo recording</a>
-      <a href="#hosting">Hosting an interview</a>
-      <a href="#guest">Joining as a guest</a>
-      <a href="#consent">Consent & privacy</a>
-      <a href="#quality">Audio quality</a>
-      <a href="#troubleshooting">Troubleshooting</a>
-      <a href="#formats">File formats</a>
-    </nav>
+  <div class="info-box">
+    <strong>Use Google Chrome on a desktop or laptop.</strong> Mobile Safari and Firefox have limited support for the Web Audio and recording APIs Vox5000 depends on. Chrome desktop gives the most reliable experience.
+  </div>
 
-    <div class="help-card checklist-card" style="margin-bottom:28px;" id="quickstart">
-      <h2>✅ Before every recording</h2>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">1</div><div>Use <strong>wired headphones</strong> — Bluetooth adds latency and dropouts</div></div>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">2</div><div>Select your <strong>external mic</strong> from the dropdown — not the built-in laptop mic</div></div>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">3</div><div>Do the <strong>5-second mic test</strong> and listen back before starting</div></div>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">4</div><div>Keep levels <strong>peaking around –12 dB</strong> — never hitting 0 dB red</div></div>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">5</div><div>Use <strong>Chrome on desktop</strong> for the most reliable experience</div></div>
-      <div class="checklist-item"><div class="checklist-num" aria-hidden="true">6</div><div>In interview rooms, <strong>guests must keep their tab open</strong> until the track transfer completes</div></div>
-    </div>
+  <!-- BEFORE YOU RECORD -->
+  <div class="help-section" id="before">
+    <span class="help-section-icon">✅</span>
+    <h2>Before every recording</h2>
+    <ul class="steps">
+      <li><div class="step-num">1</div>Use <strong>wired headphones</strong> — Bluetooth adds latency and dropouts</li>
+      <li><div class="step-num">2</div>Select your <strong>external mic</strong> from the dropdown — not the built in laptop mic</li>
+      <li><div class="step-num">3</div>Do the <strong>5 second mic test</strong> and listen back before starting</li>
+      <li><div class="step-num">4</div>Keep levels <strong>peaking around minus 12 dB</strong> — never hitting 0 dB red</li>
+      <li><div class="step-num">5</div>Use <strong>Chrome on desktop</strong> for the most reliable experience</li>
+      <li><div class="step-num">6</div>In interview rooms, <strong>guests must keep their tab open</strong> until the track transfer completes</li>
+    </ul>
+  </div>
 
-    <div class="help-grid">
+  <!-- SOLO RECORDING -->
+  <div class="help-section" id="solo">
+    <span class="help-section-icon">🎙</span>
+    <h2>Solo recording</h2>
+    <p>Click <strong>Start solo recording</strong> on the home page. Select your microphone and choose MP3 or WAV export. Do the 5 second mic test to check your levels. Hit Record — the same button stops recording. Your file downloads automatically when you stop.</p>
+    <p>Nothing is sent to any server. All recording is local to your device.</p>
+    <p><strong>Note on WAV export:</strong> Vox5000 records using your browser's WebM Opus codec. The WAV export converts this to WAV format — it is not a true uncompressed PCM capture. For broadcast delivery, MP3 320 kbps works well. If you need true lossless capture, record directly into your DAW using an audio interface.</p>
+  </div>
 
-      <div class="help-card" id="solo">
-        <h2>🎙 Solo recording</h2>
-        <ul>
-          <li>Click Start solo recording on the home page</li>
-          <li>Select your microphone and choose MP3 or WAV export</li>
-          <li>Do the 5-second mic test to check your levels</li>
-          <li>Hit Record — the same button stops recording</li>
-          <li>Your file downloads automatically when you stop</li>
-          <li>Nothing is sent to any server — all recording is local</li>
-          <li>WAV export converts from the recorded audio — not a true lossless capture</li>
-        </ul>
-      </div>
+  <!-- HOSTING -->
+  <div class="help-section" id="hosting">
+    <span class="help-section-icon">🎧</span>
+    <h2>Hosting an interview</h2>
+    <ul class="steps">
+      <li><div class="step-num">1</div>Click <strong>Create interview room</strong> and name the room</li>
+      <li><div class="step-num">2</div>Copy the <strong>guest invite link</strong> and send via WhatsApp or email</li>
+      <li><div class="step-num">3</div>Do not use the guest link yourself — reopen your room from My Rooms</li>
+      <li><div class="step-num">4</div>Admit guests from the waiting queue and check consent status</li>
+      <li><div class="step-num">5</div>Hit Record — a 5 second countdown syncs all screens</li>
+      <li><div class="step-num">6</div>Stop recording — guest tracks transfer to you automatically</li>
+      <li><div class="step-num">7</div>Download separate tracks and the consent log</li>
+    </ul>
+    <p style="margin-top:20px">Tracks are WebM Opus files — open in any modern DAW or editor.</p>
+  </div>
 
-      <div class="help-card" id="hosting">
-        <h2>🎧 Hosting an interview</h2>
-        <ul>
-          <li>Click Create interview room and name the room</li>
-          <li>Copy the <strong>guest invite link</strong> — send via WhatsApp or email</li>
-          <li>Do not use the guest link yourself — reopen your room from My Rooms</li>
-          <li>Admit guests from the waiting queue</li>
-          <li>Check consent status for each guest</li>
-          <li>Hit Record — 5-second countdown on all screens</li>
-          <li>Stop recording — guest tracks transfer to you automatically</li>
-          <li>Download separate tracks and the consent log</li>
-          <li>Tracks are WebM Opus files — open in any modern DAW or editor</li>
-        </ul>
-      </div>
+  <!-- GUEST -->
+  <div class="help-section" id="guest">
+    <span class="help-section-icon">🙋</span>
+    <h2>Joining as a guest</h2>
+    <ul class="steps">
+      <li><div class="step-num">1</div>Click the link the host sent you — no install needed</li>
+      <li><div class="step-num">2</div>Put wired headphones on before entering</li>
+      <li><div class="step-num">3</div>Select your mic and do the mic test on the setup screen</li>
+      <li><div class="step-num">4</div>Enter your name — it labels your audio track</li>
+      <li><div class="step-num">5</div>Choose whether to be recorded or join as Observer (mic off)</li>
+      <li><div class="step-num">6</div>Wait for the host to admit you</li>
+      <li><div class="step-num">7</div><strong>Keep the tab open</strong> until you see the green Done message</li>
+    </ul>
+    <p style="margin-top:20px">If the transfer fails, download your backup track and send it to the host via WeTransfer or Google Drive.</p>
+  </div>
 
-      <div class="help-card" id="guest">
-        <h2>🙋 Joining as a guest</h2>
-        <ul>
-          <li>Click the link the host sent you — no install needed</li>
-          <li>Put wired headphones on before entering</li>
-          <li>Select your mic and do the mic test on the setup screen</li>
-          <li>Enter your name — it labels your audio track</li>
-          <li>Choose whether to be recorded or join as Observer (mic off)</li>
-          <li>Wait for the host to admit you</li>
-          <li><strong>Keep the tab open until you see the green Done message</strong></li>
-          <li>If transfer fails, download your backup track and send it to the host</li>
-        </ul>
-      </div>
+  <!-- AUDIO QUALITY -->
+  <div class="help-section" id="quality">
+    <span class="help-section-icon">🎚</span>
+    <h2>Audio quality tips</h2>
+    <p>Use an external USB or XLR interface mic — not the laptop built in. Use wired headphones, not Bluetooth. Record in a quiet room — close doors, turn off air conditioning. Keep levels peaking at minus 12 dB, not 0 dB. Use Chrome on desktop for interviews.</p>
+    <p>MP3 320 kbps is the standard for radio delivery. The native recorded format is WebM Opus — high quality at low file size and opens in all modern editors.</p>
+  </div>
 
-      <div class="help-card" id="consent">
-        <h2>🔒 Consent & privacy</h2>
-        <ul>
-          <li>Solo recordings stay entirely on your device — nothing is sent anywhere</li>
-          <li>In interview rooms, audio transfers peer-to-peer — Vox5000 never sees it</li>
-          <li>The consent log is stored locally by the host and downloaded as a text file</li>
-          <li>The log includes name, role, consent status, timestamp and browser details</li>
-          <li>IP addresses are NOT collected or logged</li>
-          <li>Observer mode: mic off, can hear and chat, not recorded</li>
-        </ul>
-      </div>
+  <!-- FILE FORMATS -->
+  <div class="help-section" id="formats">
+    <span class="help-section-icon">💾</span>
+    <h2>Downloads and file formats</h2>
+    <table class="format-table">
+      <thead>
+        <tr>
+          <th>Format</th>
+          <th>Best for</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>MP3</td>
+          <td>Broadcast delivery and sharing. 320 kbps. Small file size, universally compatible.</td>
+        </tr>
+        <tr>
+          <td>WAV</td>
+          <td>Editing and archiving. Converted from recorded audio — not original PCM, but a clean working file.</td>
+        </tr>
+        <tr>
+          <td>WebM</td>
+          <td>Native recorded format from interview rooms. Opens in all modern DAWs and editors. High quality, small size.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:20px">Guest tracks are labelled with the guest's name and a timestamp. Files go to your Downloads folder — press Ctrl+J or Cmd+Shift+J in Chrome to find recent downloads.</p>
+  </div>
 
-      <div class="help-card" id="quality">
-        <h2>🎚 Audio quality</h2>
-        <ul>
-          <li>External USB or XLR interface mic — not the laptop built-in</li>
-          <li>Wired headphones — not Bluetooth</li>
-          <li>Quiet room — close doors, turn off air conditioning</li>
-          <li>Levels peaking at –12 dB — not 0 dB</li>
-          <li>MP3 320 kbps for broadcast delivery and sharing</li>
-          <li>WebM Opus is the native recorded format — high quality at low file size</li>
-          <li>WAV export is a conversion — not original PCM</li>
-          <li>Chrome on desktop for interviews</li>
-        </ul>
-      </div>
+  <!-- TROUBLESHOOTING -->
+  <div class="help-section" id="troubleshooting">
+    <span class="help-section-icon">🔧</span>
+    <h2>Troubleshooting</h2>
 
-      <div class="help-card" id="formats">
-        <h2>💾 Downloads & formats</h2>
-        <ul>
-          <li><strong>MP3</strong> — compressed, great for delivery and sharing</li>
-          <li><strong>WAV export</strong> — PCM WAV converted from the recorded audio</li>
-          <li><strong>WebM</strong> — the native recorded format, opens in all modern editors</li>
-          <li>320 kbps MP3 is the standard for radio delivery</li>
-          <li>Interview room tracks download as WebM Opus files</li>
-          <li>Guest tracks are labelled with the guest's name and a timestamp</li>
-          <li>Files go to your Downloads folder — Ctrl+J / Cmd+J in Chrome to find them</li>
-        </ul>
-      </div>
-
-    </div>
-
-    <div class="help-card help-card-full" id="troubleshooting">
-      <h2>🔧 Troubleshooting</h2>
-
-      <div class="trouble-item">
-        <div class="trouble-q">🚫 My microphone is not showing up</div>
-        <div class="trouble-a">Make sure your mic is plugged in before loading the page. Check it appears in your computer's sound settings. Refresh after plugging it in. On Windows, check Chrome has mic permission in Settings → Privacy → Microphone.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">🔒 I clicked Deny on the microphone permission</div>
-        <div class="trouble-a">Click the padlock or microphone icon in Chrome's address bar → Site settings → Microphone → Allow. Then refresh the page.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">🔊 I can hear myself echoing</div>
-        <div class="trouble-a">You or your guest is using speakers instead of headphones. Speakers pick up the call audio and feed it back into the mic. Everyone must use wired headphones or earphones.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">📊 The recording is too quiet or distorted</div>
-        <div class="trouble-a">Too quiet — increase Input Gain until peaks hit around –12 dB. Distorted (red on waveform) — reduce Input Gain immediately. Target: –24 to –6 dB.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">👥 Guests are not appearing in my waiting queue</div>
-        <div class="trouble-a">Make sure you sent the correct guest invite link (copy it from the Invite Guests button — not from My Rooms). Both host and guest must have their pages open at the same time. Ask the guest to refresh and try again. Both should use Chrome on desktop.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">📤 The guest transfer is stuck or not progressing</div>
-        <div class="trouble-a">Both host and guest must keep their page open and not lock their screen. If the transfer stalls, the guest will be prompted to download their backup track and send it via WeTransfer or Google Drive.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">🔗 My Rooms opens the room as a guest instead of host</div>
-        <div class="trouble-a">Always use the Open as host button in My Rooms to reopen your room. Do not copy the guest link and open it yourself — that link is for guests only.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">📱 I'm recording on a phone or tablet</div>
-        <div class="trouble-a">Use Google Chrome on your device, allow microphone access, keep the Vox5000 tab open, and do not lock the screen or switch apps during recording.</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">💾 I can't find my downloaded file</div>
-        <div class="trouble-a">Check your Downloads folder. In Chrome press Ctrl+J (Windows) or Cmd+Shift+J (Mac) to see recent downloads. Files include your name and a timestamp, e.g. Ian_HOST_2026-06-21.webm</div>
-      </div>
-      <div class="trouble-item">
-        <div class="trouble-q">🏠 My rooms have disappeared</div>
-        <div class="trouble-a">Rooms are stored in your browser's local storage. They can be lost if you clear browser data, use private/incognito mode, or switch to a different browser or device.</div>
-      </div>
+    <div class="trouble-item">
+      <h3>My microphone is not showing up</h3>
+      <p>Make sure your mic is plugged in before loading the page. Check it appears in your computer's sound settings. Refresh after plugging it in. On Windows, check Chrome has mic permission in Settings → Privacy → Microphone.</p>
     </div>
 
-  </main>
-
-  <footer class="footer" role="contentinfo">
-    <div class="footer-inner">
-      <span>© 2026 Vox5000</span>
-      <a href="privacy.html" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
+    <div class="trouble-item">
+      <h3>I clicked Deny on the microphone permission</h3>
+      <p>Click the padlock or microphone icon in Chrome's address bar → Site settings → Microphone → Allow. Then refresh the page.</p>
     </div>
-  </footer>
+
+    <div class="trouble-item">
+      <h3>I can hear myself echoing</h3>
+      <p>You or your guest is using speakers instead of headphones. Speakers pick up the call audio and feed it back into the mic. Everyone must use wired headphones or earphones.</p>
+    </div>
+
+    <div class="trouble-item">
+      <h3>The recording is too quiet or distorted</h3>
+      <p>Too quiet — increase Input Gain until peaks hit around minus 12 dB. Distorted (red on waveform) — reduce Input Gain immediately. Target: minus 24 to minus 6 dB.</p>
+    </div>
+
+    <div class="trouble-item">
+      <h3>Guests are not appearing in my waiting queue</h3>
+      <p>Make sure you sent the correct guest invite link. Both host and guest must have their pages open at the same time. Ask the guest to refresh and try again. Both should use Chrome on desktop.</p>
+    </div>
+
+    <div class="trouble-item">
+      <h3>The guest transfer is stuck or not progressing</h3>
+      <p>Both host and guest must keep their page open and not lock their screen. If the transfer stalls, the guest will be prompted to download their backup track and send it via WeTransfer or Google Drive.</p>
+    </div>
+
+    <div class="trouble-item">
+      <h3>My Rooms opens the room as a guest instead of host</h3>
+      <p>Always use the Open as host button in My Rooms to reopen your room. Do not copy the guest link and open it yourself — that link is for guests only.</p>
+    </div>
+
+    <div class="trouble-item">
+      <h3>My rooms have disappeared</h3>
+      <p>Rooms are stored in your browser's local storage. They can be lost if you clear browser data, use private or incognito mode, or switch to a different browser or device.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">VOX<span>5000</span></div>
+    <p class="footer-note">Solo recordings never leave your device · Interview audio is peer to peer</p>
+    <ul class="footer-links">
+      <li><a href="help.html">Help</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+    </ul>
+  </div>
+</footer>
+
 </body>
 </html>
