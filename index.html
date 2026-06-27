@@ -1,809 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Broadcast quality audio recorder. Free in your browser. Separate tracks. Local files. No install. No account. Built by a broadcaster.">
-<title>Vox5000 — Broadcast Quality Audio Recorder. Free. In Your Browser.</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:          #f5f5f7;
-  --white:       #ffffff;
-  --border:      #d2d2d7;
-  --muted:       #6e6e73;
-  --body:        #3a3a3c;
-  --heading:     #1d1d1f;
-  --white-pure:  #ffffff;
-  --green:       #0a8a5c;
-  --green-hi:    #0dab73;
-  --green-light: #e6f7f1;
-}
-
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--bg);
-  color: var(--body);
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* ── NAV ── */
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
-  background: rgba(245,245,247,0.92);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-}
-
-/* Logo: VOX in dark, 5000 in green */
-.nav-logo {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: var(--heading);
-  text-decoration: none;
-}
-.nav-logo span { color: var(--green); }
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-  list-style: none;
-}
-
-.nav-links a {
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.nav-links a:hover { color: var(--heading); }
-
-.nav-cta {
-  background: var(--heading) !important;
-  color: var(--white) !important;
-  padding: 8px 20px;
-  border-radius: 980px;
-  font-weight: 500 !important;
-  transition: background 0.2s !important;
-}
-
-.nav-cta:hover { background: var(--green) !important; }
-
-/* ── HERO ── */
-.hero {
-  background: var(--white);
-  padding-top: 56px;
-}
-
-.hero-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 72px 40px 72px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 60px;
-  align-items: center;
-}
-
-.hero-tag {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--green);
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hero-tag::before {
-  content: '';
-  width: 24px;
-  height: 2px;
-  background: var(--green);
-  border-radius: 1px;
-  flex-shrink: 0;
-}
-
-h1 {
-  font-size: clamp(42px, 5.5vw, 68px);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.03em;
-  color: var(--heading);
-  margin-bottom: 24px;
-}
-
-h1 .line2 { color: var(--green); display: block; }
-h1 .line3 {
-  color: var(--muted);
-  font-weight: 300;
-  font-size: 0.68em;
-  display: block;
-  letter-spacing: -0.01em;
-  margin-top: 8px;
-}
-
-.hero-sub {
-  font-size: 17px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin-bottom: 36px;
-  max-width: 440px;
-}
-
-.hero-sub strong { color: var(--body); font-weight: 600; }
-
-/* ── BUTTONS ── */
-.hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 40px;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--heading);
-  color: var(--white);
-  font-size: 15px;
-  font-weight: 500;
-  padding: 14px 28px;
-  border-radius: 980px;
-  text-decoration: none;
-  transition: background 0.2s, transform 0.1s;
-}
-
-.btn-primary:hover { background: var(--green); transform: translateY(-1px); }
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: var(--body);
-  font-size: 15px;
-  padding: 14px 24px;
-  border-radius: 980px;
-  text-decoration: none;
-  border: 1.5px solid var(--border);
-  transition: border-color 0.2s, color 0.2s;
-}
-
-.btn-secondary:hover { border-color: var(--body); color: var(--heading); }
-
-/* ── TRUST ROW ── */
-.trust-row {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-  flex-wrap: nowrap;
-  /* space from the features grey bar below */
-  padding-bottom: 32px;
-}
-
-.trust-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--body);
-  white-space: nowrap;
-}
-
-.trust-check {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--green-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-/* ── HERO IMAGE PLACEHOLDER ── */
-.hero-image-wrap { position: relative; }
-
-.hero-img-placeholder {
-  width: 100%;
-  height: 460px;
-  background: #e8e8ed;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  border: 2px dashed #b8b8c0;
-  /* breathing room so it doesn't touch the section below */
-  margin-bottom: 0;
-}
-
-.hero-img-placeholder svg { opacity: 0.3; }
-
-.hero-img-placeholder span {
-  font-size: 13px;
-  font-weight: 600;
-  color: #999;
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.hero-img-placeholder p {
-  font-size: 12px;
-  color: #b0b0b8;
-  text-align: center;
-  max-width: 200px;
-  line-height: 1.5;
-}
-
-/* ── SECTION LAYOUT ── */
-.wrap-grey  { background: var(--bg); }
-.wrap-white { background: var(--white); }
-
-.section {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 80px 40px;
-}
-
-/* Section label — big, bold, green */
-.section-label {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--green);
-  margin-bottom: 12px;
-  text-transform: uppercase;
-}
-
-h2 {
-  font-size: clamp(30px, 3.8vw, 46px);
-  font-weight: 700;
-  color: var(--heading);
-  letter-spacing: -0.025em;
-  line-height: 1.12;
-  margin-bottom: 14px;
-}
-
-.section-sub {
-  font-size: 18px;
-  color: var(--muted);
-  line-height: 1.65;
-  max-width: 540px;
-  margin-bottom: 52px;
-}
-
-/* ── FEATURES GRID ── */
-.panel-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.panel-cell {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 32px 28px;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.panel-cell:hover {
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-  transform: translateY(-2px);
-}
-
-.panel-icon {
-  width: 48px;
-  height: 48px;
-  background: var(--green-light);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 18px;
-  font-size: 22px;
-}
-
-.panel-cell h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--heading);
-  margin-bottom: 10px;
-  line-height: 1.3;
-}
-
-.panel-cell p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.7;
-}
-
-/* ── ORIGIN ── */
-.origin-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
-  align-items: center;
-}
-
-.origin-body p {
-  font-size: 16px;
-  color: var(--muted);
-  line-height: 1.8;
-  margin-bottom: 18px;
-}
-
-.origin-body p strong { color: var(--body); font-weight: 600; }
-
-/* Session info card */
-.origin-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.origin-card-header {
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.origin-card-dot { width: 10px; height: 10px; border-radius: 50%; }
-
-.origin-card-header span {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  color: var(--muted);
-  letter-spacing: 0.06em;
-  margin-left: 8px;
-}
-
-.origin-card-body { padding: 4px 0; }
-
-.origin-stat {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.origin-stat:last-child { border-bottom: none; }
-
-.stat-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.stat-value {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 14px;
-  color: var(--heading);
-  font-weight: 600;
-  text-align: right;
-}
-
-/* ── WHAT MAKES IT DIFFERENT ── */
-.different-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.diff-cell {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 36px 32px;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.diff-cell:hover {
-  box-shadow: 0 8px 32px rgba(0,0,0,0.07);
-  transform: translateY(-2px);
-}
-
-.diff-number {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--green);
-  letter-spacing: 0.1em;
-  margin-bottom: 14px;
-  display: block;
-}
-
-.diff-cell h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--heading);
-  margin-bottom: 12px;
-  line-height: 1.25;
-}
-
-.diff-cell p {
-  font-size: 15px;
-  color: var(--muted);
-  line-height: 1.75;
-}
-
-/* ── NEWSLETTER ── */
-.newsletter-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
-  align-items: center;
-}
-
-.newsletter-left h2 { margin-bottom: 16px; }
-
-.newsletter-left p {
-  font-size: 17px;
-  color: var(--muted);
-  line-height: 1.75;
-}
-
-.newsletter-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 40px;
-}
-
-.newsletter-card-label {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 24px;
-}
-
-.email-field {
-  width: 100%;
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  font-size: 15px;
-  font-family: 'Inter', sans-serif;
-  color: var(--heading);
-  outline: none;
-  margin-bottom: 12px;
-  transition: border-color 0.15s;
-}
-
-.email-field::placeholder { color: #b0b0b8; }
-.email-field:focus { border-color: var(--green); }
-
-.email-btn {
-  width: 100%;
-  background: var(--heading);
-  color: var(--white);
-  border: none;
-  border-radius: 10px;
-  padding: 15px 20px;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.email-btn:hover { background: var(--green); }
-
-.email-note {
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-  margin-top: 14px;
-}
-
-/* ── FOOTER — dark with white readable text ── */
-footer {
-  background: var(--heading);
-}
-
-.footer-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-/* Footer logo: VOX in white, 5000 in green */
-.footer-logo {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: #ffffff;
-}
-
-.footer-logo span { color: var(--green-hi); }
-
-.footer-note {
-  font-size: 13px;
-  color: #c0c0c8;
-}
-
-.footer-links { display: flex; gap: 24px; list-style: none; }
-
-.footer-links a {
-  font-size: 13px;
-  color: #c0c0c8;
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.footer-links a:hover { color: #ffffff; }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 860px) {
-  nav { padding: 0 20px; }
-  .nav-links { display: none; }
-  .hero-inner { grid-template-columns: 1fr; padding: 40px 20px 40px; gap: 40px; }
-  .hero-img-placeholder { height: 280px; }
-  .trust-row { flex-wrap: wrap; gap: 16px; }
-  .section { padding: 60px 20px; }
-  .panel-grid { grid-template-columns: 1fr; }
-  .origin-grid { grid-template-columns: 1fr; gap: 40px; }
-  .different-grid { grid-template-columns: 1fr; }
-  .newsletter-inner { grid-template-columns: 1fr; gap: 40px; }
-  .footer-inner { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vox5000 — Free Broadcast Audio Recorder</title>
+  <meta name="description" content="Record remote interviews without uploading your audio. Free browser-based WAV and MP3 recorder for radio presenters, journalists and podcasters." />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="icon" sizes="512x512" href="favicon-512.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a href="#" class="nav-logo">VOX<span>5000</span></a>
-  <ul class="nav-links">
-    <li><a href="#features">Features</a></li>
-    <li><a href="#about">About</a></li>
-    <li><a href="#different">Why Vox5000</a></li>
-    <li><a href="#newsletter">Newsletter</a></li>
-    <li><a href="https://www.vox5000.com/index.html" class="nav-cta">Open recorder →</a></li>
-  </ul>
-</nav>
+  <header class="header" role="banner">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/" aria-label="Vox5000 home">
+          <img src="logo.png" alt="VOX5000" class="logo-img" />
+        </a>
+      </div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a href="/" class="nav-link nav-active" aria-current="page">Home</a>
+        <a href="/record" class="nav-link">Record</a>
+        <a href="/help" class="nav-link">Help</a>
+      </nav>
+      <a href="/room" class="nav-cta">Create room</a>
+    </div>
+  </header>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-left">
-      <div class="hero-tag">Free · No install · No account</div>
-      <h1>
-        Broadcast
-        <span class="line2">Quality Audio</span>
-        <span class="line3">Recorder. Free. In your browser.</span>
-      </h1>
-      <p class="hero-sub">
-        Clean separate tracks from every speaker. Files stay on your device. Send guests a link and they click, consent, and record. <strong>Built by a broadcaster who needed it to actually work.</strong>
-      </p>
+  <main class="main" id="main-content">
+
+    <!-- ── HERO ── -->
+    <section class="hero" aria-label="Introduction">
+      <p class="hero-eyebrow">Free · No account · No install</p>
+      <h1 class="hero-title">Record remote interviews without uploading your audio.</h1>
+      <p class="hero-sub">VOX5000 gives radio presenters, journalists and podcasters clean separate tracks from the browser. Record in WAV or MP3, keep files on your device, and send guests a simple interview link.</p>
       <div class="hero-actions">
-        <a href="https://www.vox5000.com/index.html" class="btn-primary">● Start recording</a>
-        <a href="https://www.vox5000.com/room.html" class="btn-secondary">Create interview room →</a>
+        <a href="/record" class="btn btn-record" id="soloModeBtn" aria-expanded="false" aria-controls="soloRecorder">
+          <span class="rec-dot" aria-hidden="true"></span>
+          Start solo recording
+        </a>
+        <a href="/room" class="btn btn-ghost">Create interview room</a>
       </div>
-      <div class="trust-row">
-        <div class="trust-item">
-          <div class="trust-check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0a8a5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          No install
-        </div>
-        <div class="trust-item">
-          <div class="trust-check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0a8a5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          No account
-        </div>
-        <div class="trust-item">
-          <div class="trust-check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0a8a5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          Audio stays on your device
-        </div>
-        <div class="trust-item">
-          <div class="trust-check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0a8a5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          Always free
+      <!-- Guest join box -->
+      <div class="guest-join-box">
+        <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Been invited to a room?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="joinCodeInput" placeholder="Paste your invite link or room code here" class="join-input" aria-label="Room invite link or code" />
+          <button class="btn btn-ghost" id="joinRoomBtn" style="white-space:nowrap;flex-shrink:0;">Join Room →</button>
         </div>
       </div>
+      <div class="hero-trust" role="list" aria-label="Product features">
+        <span role="listitem">No install</span>
+        <span role="listitem">No account</span>
+        <span role="listitem">Local first audio</span>
+        <span role="listitem">Separate guest tracks</span>
+      </div>
+    </section>
+
+    <!-- ── MODE CARDS ── -->
+    <section class="mode-cards" aria-label="Recording modes">
+      <div class="mode-card">
+        <div class="mode-card-icon" aria-hidden="true">🎙</div>
+        <h2 class="mode-card-title">Record myself</h2>
+        <p class="mode-card-desc">Capture voice tracks, links, show prep, auditions and quick pickups directly in the browser. Nothing leaves your device.</p>
+        <a href="/record" class="mode-card-btn mode-card-btn-secondary" id="soloModeBtnCard">Start solo recording</a>
+      </div>
+      <div class="mode-card mode-card-featured">
+        <div class="mode-card-icon" aria-hidden="true">🎧</div>
+        <h2 class="mode-card-title">Record an interview</h2>
+        <p class="mode-card-desc">Create a room, invite guests with a link, collect consent and download separate WAV tracks when the session ends.</p>
+        <a href="/room" class="mode-card-btn mode-card-btn-primary">Create interview room</a>
+      </div>
+    </section>
+
+    <!-- ── BROWSER WARNING ── -->
+    <div class="browser-warning" role="note" aria-label="Browser recommendation" id="browserWarning">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2L14 13H2L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.75" fill="currentColor"/></svg>
+      <span><strong>Best on Chrome desktop.</strong> Mobile Safari has limited recording support and may not work reliably for interviews.</span>
     </div>
 
-    <!-- PHOTO PLACEHOLDER — swap this div for your <img> tag when ready -->
-    <div class="hero-image-wrap">
-      <div class="hero-img-placeholder">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <rect x="6" y="10" width="36" height="28" rx="3" stroke="#999" stroke-width="2"/>
-          <circle cx="24" cy="24" r="7" stroke="#999" stroke-width="2"/>
-          <path d="M6 18l8 7 8-6 10 8 10-6" stroke="#999" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span>Your photo here</span>
-        <p>Upload your own image and we will drop it straight in</p>
-      </div>
+    <!-- ── ERROR STATES ── -->
+    <div class="error-card" id="micDeniedError" style="display:none;" role="alert">
+      <div class="error-title">🚫 Microphone access denied</div>
+      <p class="error-text">Click the microphone or lock icon in your browser's address bar, choose Allow, then refresh this page.</p>
     </div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<div class="wrap-grey" id="features">
-  <div class="section">
-    <div class="section-label">What you get</div>
-    <h2>Everything a working presenter needs.</h2>
-    <p class="section-sub">Nothing added to impress a spec sheet. Every feature exists because a broadcaster needed it.</p>
-    <div class="panel-grid">
-      <div class="panel-cell">
-        <div class="panel-icon">🎙</div>
-        <h3>Separate tracks per speaker</h3>
-        <p>Every guest records locally. You download individual WAV files labelled with each person's name, clean, isolated, and ready for your editor.</p>
-      </div>
-      <div class="panel-cell">
-        <div class="panel-icon">🔒</div>
-        <h3>Audio never leaves your device</h3>
-        <p>Solo recordings are entirely local. Interview tracks transfer peer to peer. Vox5000 never touches your audio. No server, no upload, no cloud.</p>
-      </div>
-      <div class="panel-cell">
-        <div class="panel-icon">🌐</div>
-        <h3>Nothing to install</h3>
-        <p>Open a tab, start recording. Send guests a link. No app, no plugin, no account. Works on any desktop with Chrome.</p>
-      </div>
-      <div class="panel-cell">
-        <div class="panel-icon">📊</div>
-        <h3>Broadcast level tools</h3>
-        <p>Real time waveform, input gain, level meter with safe zone markers, 5 second mic test, MP3 and WAV export. For people who care about sound.</p>
-      </div>
-      <div class="panel-cell">
-        <div class="panel-icon">✅</div>
-        <h3>Guest consent built in</h3>
-        <p>Guests confirm consent before the session starts. A timestamped log downloads with your tracks. You are covered before you press record.</p>
-      </div>
-      <div class="panel-cell">
-        <div class="panel-icon">🎧</div>
-        <h3>Interview rooms for up to 6</h3>
-        <p>Create a room, share the link, admit guests, hit record. A 5 second countdown syncs everyone. Download separate tracks when done.</p>
-      </div>
+    <div class="error-card" id="micNotFoundError" style="display:none;" role="alert">
+      <div class="error-title">🎤 No microphone found</div>
+      <p class="error-text">Make sure your USB or XLR interface mic is plugged in and recognised by your computer, then refresh the page.</p>
     </div>
-  </div>
-</div>
 
-<!-- ORIGIN / ABOUT -->
-<div class="wrap-white" id="about">
-  <div class="section">
-    <div class="origin-grid">
-      <div class="origin-body">
-        <div class="section-label">Why this exists</div>
-        <h2>Built because the alternatives were not good enough.</h2>
-        <p>When remote interviews became part of the daily workflow, the tools available were either <strong>too expensive, too complex, or simply not built for broadcast.</strong></p>
-        <p>Most tools compress audio and deliver a single mixed track. Others cost money every month and assume you want a full video production studio.</p>
-        <p>Vox5000 was built by a working broadcaster who needed <strong>clean separate tracks, local files, and a guest link that just works</strong> without a subscription, an account, or an install.</p>
-        <p>That is still all it is. That is the point.</p>
+    <!-- ── SOLO RECORDER (hidden until triggered) ── -->
+    <div id="soloRecorder" style="display:none;" aria-label="Solo recorder">
+
+      <div class="section-divider"><span>Solo Recorder</span></div>
+
+      <!-- Mic permission notice -->
+      <div class="notice-bar" id="permNotice" role="status">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
+        Allow microphone access when your browser asks, then select your mic below.
       </div>
-      <div class="origin-card">
-        <div class="origin-card-header">
-          <div class="origin-card-dot" style="background:#e03c3c"></div>
-          <div class="origin-card-dot" style="background:#d4820a;margin-left:4px"></div>
-          <div class="origin-card-dot" style="background:#1db87a;margin-left:4px"></div>
-          <span>vox5000 — session info</span>
+
+      <!-- Core controls -->
+      <section class="card" aria-label="Microphone and format">
+        <div class="card-label">Input & Format</div>
+        <div class="control-row">
+          <label for="micSelect" class="field-label">Mic</label>
+          <select id="micSelect" class="select"><option value="">Waiting for mic access…</option></select>
         </div>
-        <div class="origin-card-body">
-          <div class="origin-stat">
-            <span class="stat-label">Account required</span>
-            <span class="stat-value">None</span>
-          </div>
-          <div class="origin-stat">
-            <span class="stat-label">Install required</span>
-            <span class="stat-value">None</span>
-          </div>
-          <div class="origin-stat">
-            <span class="stat-label">Audio stored on server</span>
-            <span class="stat-value">Never</span>
-          </div>
-          <div class="origin-stat">
-            <span class="stat-label">Export formats</span>
-            <span class="stat-value">WAV · MP3</span>
-          </div>
+        <div class="control-row">
+          <label for="formatSelect" class="field-label">Format</label>
+          <select id="formatSelect" class="select">
+            <option value="mp3">MP3 — compressed, great for delivery</option>
+            <option value="wav">WAV export — converted from recorded audio</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="qualitySelect" class="field-label">Quality</label>
+          <select id="qualitySelect" class="select"></select>
+        </div>
+        <div class="setup-footer">
+          <button class="btn btn-ghost btn-sm" id="testBtn" aria-label="Record a 5 second mic test and play it back">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"><polygon points="3,2 11,7 3,12" fill="currentColor"/></svg>
+            5s mic test
+          </button>
+          <span style="font-size:12px;color:var(--text3);">Records and plays back to check your level and sound</span>
+        </div>
+      </section>
+
+      <!-- Record button and timer — big and obvious -->
+      <section class="card recorder-card" aria-label="Recording controls">
+        <div class="duration-display">
+          <span class="duration" id="duration" aria-live="polite" aria-label="Recording duration">00:00:00.0</span>
+          <span class="duration-status" id="durStatus" aria-live="polite">Ready to record</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-record" id="recBtn" aria-label="Start or stop recording">
+            <span class="rec-dot" aria-hidden="true"></span> Record
+          </button>
+          <button class="btn btn-ghost" id="pauseBtn" disabled aria-label="Pause or resume recording">⏸ Pause</button>
+        </div>
+        <div class="size-display" id="sizeDisplay" aria-live="polite"></div>
+      </section>
+
+      <!-- Waveform — always visible -->
+      <div class="waveform-section" aria-label="Live waveform monitor">
+        <div class="wave-header">
+          <span class="wave-title">Waveform Monitor</span>
+          <span class="wave-hint" aria-hidden="true">Scrolls during recording · Red = clipping</span>
+        </div>
+        <canvas id="waveCanvas" class="wave-canvas" height="100" aria-hidden="true"></canvas>
+      </div>
+
+      <!-- Audio settings — always visible, not hidden -->
+      <div class="card" id="audioSettingsCard">
+        <div class="card-label" style="margin-bottom:14px;">Audio Settings</div>
+
+        <div class="level-slider-row">
+          <label class="level-slider-label" for="inputGainSlider">Input Gain</label>
+          <input type="range" id="inputGainSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
+          <span class="level-slider-val" id="inputGainVal">0 dB</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">How loud your mic is recorded · Double-click to reset</div>
+
+        <div class="level-slider-row">
+          <label class="level-slider-label" for="monitorSlider">Monitor</label>
+          <input type="range" id="monitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
+          <span class="level-slider-val" id="monitorVal">Off</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">What you hear in headphones — doesn't affect recording</div>
+
+        <div class="meter-wrap" role="meter" aria-label="Input level meter">
+          <div class="meter-bar" id="meterBar"></div>
+          <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;">
+          <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
+          <span style="color:var(--red);">● Clipping: above –6 dB</span>
+        </div>
+        <div class="clip-warn" id="clipWarn" style="display:none;margin-top:10px;" role="alert" aria-live="assertive">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2L13 12H1L7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.5" r="0.75" fill="currentColor"/></svg>
+          Clipping — reduce input gain
         </div>
       </div>
+
+      <!-- Downloads -->
+      <section class="card downloads" id="dlSection" aria-label="Download your recordings" aria-live="polite">
+        <div class="card-label">Downloads Ready</div>
+        <div class="dl-grid" id="dlGrid"></div>
+      </section>
+
     </div>
-  </div>
-</div>
 
-<!-- WHAT MAKES IT DIFFERENT -->
-<div class="wrap-grey" id="different">
-  <div class="section">
-    <div class="section-label">Why Vox5000</div>
-    <h2>What makes it different.</h2>
-    <p class="section-sub">Four things that matter to anyone who records for a living.</p>
-    <div class="different-grid">
-      <div class="diff-cell">
-        <span class="diff-number">01</span>
-        <h3>Your audio never touches a server</h3>
-        <p>Most tools upload your audio to the cloud. Vox5000 does not. Solo recordings stay on your device. Interview tracks transfer directly between participants, peer to peer.</p>
+    <!-- ── HOW ROOMS WORK ── -->
+    <section class="how-it-works" id="howItWorks" aria-label="How interview rooms work">
+      <div class="hiw-title">How interview rooms work</div>
+      <div class="hiw-steps" role="list">
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">1</div><div class="hiw-text">Click Create interview room and enter your name</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">2</div><div class="hiw-text">Copy the invite link and send it to guests via WhatsApp or email</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">3</div><div class="hiw-text">Guests click the link, enter their name and consent to recording</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">4</div><div class="hiw-text">Admit guests from your waiting queue</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">5</div><div class="hiw-text">Hit Record — 5 second countdown on all screens, then everyone records locally</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">6</div><div class="hiw-text">Stop the session — guest tracks upload to you automatically</div></div>
+        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">7</div><div class="hiw-text">Download separate WAV files clearly labelled with each person's name</div></div>
       </div>
-      <div class="diff-cell">
-        <span class="diff-number">02</span>
-        <h3>Separate tracks as standard</h3>
-        <p>A single mixed track is useless in post production. Vox5000 gives you one clean file per speaker, labelled by name, from the moment you hit stop.</p>
-      </div>
-      <div class="diff-cell">
-        <span class="diff-number">03</span>
-        <h3>Built in a real broadcast workflow</h3>
-        <p>The level meter, gain control, mic test, markers, and format options were designed by someone who records for air. Practical decisions, not decorative ones.</p>
-      </div>
-      <div class="diff-cell">
-        <span class="diff-number">04</span>
-        <h3>Free with no strings</h3>
-        <p>No trial. No freemium limit. No credit card. No tier that hides the useful features. Free because it was built to be used, not to convert you.</p>
-      </div>
+    </section>
+
+    <!-- ── TIPS ── -->
+    <section class="tips-section" aria-label="Broadcast quality tips">
+      <div class="tips-title">For best broadcast quality</div>
+      <ul class="tips-list">
+        <li>Always use wired headphones — Bluetooth adds latency and potential dropouts</li>
+        <li>Use an external USB or XLR interface mic — not your laptop's built-in mic</li>
+        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB</li>
+        <li>If the waveform goes red, reduce input gain immediately</li>
+        <li>Monitor only affects what you hear — it does not change the recording</li>
+        <li>Do the 5s mic test before every session and check your sound</li>
+        <li>Use Chrome on a desktop or laptop for the most reliable experience</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer-inner">
+      <span>© 2026 Vox5000</span>
+      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, audio transfers peer to peer — Vox5000 does not store audio on any server.</span>
+      <a href="/privacy" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
     </div>
-  </div>
-</div>
+  </footer>
 
-<!-- NEWSLETTER -->
-<div class="wrap-white" id="newsletter">
-  <div class="section">
-    <div class="newsletter-inner">
-      <div class="newsletter-left">
-        <div class="section-label">Newsletter</div>
-        <h2>From the studio.</h2>
-        <p>Feature updates, broadcast tips, and interviews with working presenters and journalists recorded using Vox5000's own interview room. No noise. Unsubscribe any time.</p>
-      </div>
-      <div class="newsletter-card">
-        <div class="newsletter-card-label">Vox5000 Newsletter</div>
-        <!-- REPLACE WITH BEEHIIV EMBED CODE -->
-        <input type="email" class="email-field" placeholder="your@email.com">
-        <button class="email-btn" onclick="window.open('https://vox5000.beehiiv.com','_blank')">
-          Subscribe free →
-        </button>
-        <!-- END PLACEHOLDER -->
-        <p class="email-note">No spam · Unsubscribe any time</p>
-      </div>
-    </div>
-  </div>
-</div>
+  <script src="app.js"></script>
+  <script>
+    // Solo mode toggle
+    const soloRecorder = document.getElementById('soloRecorder');
+    const howItWorks = document.getElementById('howItWorks');
 
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-logo">VOX<span>5000</span></div>
-    <p class="footer-note">Solo recordings never leave your device · Interview audio is peer to peer</p>
-    <ul class="footer-links">
-      <li><a href="https://www.vox5000.com/help.html">Help</a></li>
-      <li><a href="https://www.vox5000.com/privacy.html">Privacy</a></li>
-    </ul>
-  </div>
-</footer>
+    function openSolo() {
+      soloRecorder.style.display = 'block';
+      howItWorks.style.display = 'none';
+      document.getElementById('soloModeBtn').setAttribute('aria-expanded','true');
+      soloRecorder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    document.getElementById('soloModeBtn').addEventListener('click', openSolo);
+    document.getElementById('soloModeBtnCard').addEventListener('click', openSolo);
 
+    // Guest room join
+    function joinRoom() {
+      const val = document.getElementById('joinCodeInput').value.trim();
+      if (!val) { document.getElementById('joinCodeInput').focus(); return; }
+      let code = val;
+      try {
+        const url = new URL(val);
+        const r = url.searchParams.get('r');
+        if (r) code = r;
+      } catch(e) {
+        code = val.replace(/[^A-Za-z0-9]/g,'').toUpperCase().substr(0,8);
+      }
+      if (code) window.location.href = `/room?r=${code}`;
+    }
+    document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
+    document.getElementById('joinCodeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinRoom();
+    });
+  </script>
 </body>
 </html>

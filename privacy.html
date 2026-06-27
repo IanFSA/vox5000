@@ -1,301 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Vox5000 privacy policy. Your audio never leaves your device.">
-<title>Privacy Policy — Vox5000</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:          #f5f5f7;
-  --white:       #ffffff;
-  --border:      #d2d2d7;
-  --muted:       #6e6e73;
-  --body:        #3a3a3c;
-  --heading:     #1d1d1f;
-  --green:       #0a8a5c;
-  --green-hi:    #0dab73;
-  --green-light: #e6f7f1;
-}
-
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--bg);
-  color: var(--body);
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
-  background: rgba(245,245,247,0.92);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-}
-
-.nav-logo {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: var(--heading);
-  text-decoration: none;
-}
-.nav-logo span { color: var(--green); }
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-  list-style: none;
-}
-
-.nav-links a {
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.nav-links a:hover { color: var(--heading); }
-
-.nav-cta {
-  background: var(--heading) !important;
-  color: var(--white) !important;
-  padding: 8px 20px;
-  border-radius: 980px;
-  font-weight: 500 !important;
-  transition: background 0.2s !important;
-}
-
-.nav-cta:hover { background: var(--green) !important; }
-
-.page-header {
-  background: var(--white);
-  padding: 100px 40px 60px;
-  border-bottom: 1px solid var(--border);
-}
-
-.page-header-inner {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.page-label {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--green);
-  text-transform: uppercase;
-  letter-spacing: -0.01em;
-  margin-bottom: 12px;
-}
-
-.page-header h1 {
-  font-size: clamp(32px, 4vw, 52px);
-  font-weight: 700;
-  color: var(--heading);
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  margin-bottom: 16px;
-}
-
-.page-header p {
-  font-size: 18px;
-  color: var(--muted);
-  line-height: 1.65;
-}
-
-.content {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 60px 40px 80px;
-}
-
-.privacy-section {
-  margin-bottom: 48px;
-  padding-bottom: 48px;
-  border-bottom: 1px solid var(--border);
-}
-
-.privacy-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.privacy-section h2 {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--heading);
-  letter-spacing: -0.02em;
-  margin-bottom: 16px;
-}
-
-.privacy-section p {
-  font-size: 16px;
-  color: var(--muted);
-  line-height: 1.8;
-  margin-bottom: 14px;
-}
-
-.privacy-section p:last-child { margin-bottom: 0; }
-
-.privacy-section p strong { color: var(--body); font-weight: 600; }
-
-.highlight-box {
-  background: var(--green-light);
-  border: 1px solid rgba(10,138,92,0.2);
-  border-radius: 12px;
-  padding: 24px 28px;
-  margin-bottom: 48px;
-}
-
-.highlight-box p {
-  font-size: 16px;
-  color: var(--body);
-  line-height: 1.7;
-  margin-bottom: 10px;
-}
-
-.highlight-box p:last-child { margin-bottom: 0; }
-.highlight-box strong { color: var(--green); font-weight: 700; }
-
-footer { background: var(--heading); }
-
-.footer-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.footer-logo {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: #ffffff;
-}
-
-.footer-logo span { color: var(--green-hi); }
-.footer-note { font-size: 13px; color: #c0c0c8; }
-.footer-links { display: flex; gap: 24px; list-style: none; }
-
-.footer-links a {
-  font-size: 13px;
-  color: #c0c0c8;
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.footer-links a:hover { color: #ffffff; }
-
-@media (max-width: 760px) {
-  nav { padding: 0 20px; }
-  .nav-links { display: none; }
-  .page-header { padding: 88px 20px 48px; }
-  .content { padding: 40px 20px 60px; }
-  .footer-inner { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Vox5000</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+  <style>
+    .prose{max-width:800px;margin:0 auto;padding:40px 40px 80px;}
+    @media(max-width:600px){.prose{padding:24px 16px 80px;}}
+    @media(max-width:1023px) and (min-width:601px){.prose{padding:40px 24px 80px;}}
+    .prose h2{font-size:18px;font-weight:600;color:var(--text);margin:2rem 0 0.75rem;letter-spacing:-0.02em;}
+    .prose h2:first-of-type{margin-top:0;}
+    .prose p{font-size:15px;color:#bbb;line-height:1.7;margin-bottom:1rem;}
+    .prose ul{margin:0 0 1rem 1.25rem;}
+    .prose ul li{font-size:15px;color:#bbb;line-height:1.7;margin-bottom:0.4rem;}
+    .prose a{color:var(--yellow);text-decoration:none;}
+    .prose a:hover{text-decoration:underline;}
+    .effective{font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:2rem;}
+    .highlight-box{background:var(--bg2);border:1px solid rgba(232,255,71,0.2);border-radius:var(--radius);padding:20px 24px;margin-bottom:2rem;}
+    .highlight-box p{color:var(--text);font-size:16px;margin:0;}
+    .mode-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px;}
+    .mode-title{font-size:14px;font-weight:600;color:var(--yellow);margin-bottom:8px;}
+  </style>
 </head>
 <body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo"><a href="/"><img src="logo.png" alt="VOX5000" class="logo-img" /></a></div>
+      <nav class="main-nav">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/record" class="nav-link">Record</a>
+        <a href="/help" class="nav-link">Help</a>
+      </nav>
+    </div>
+  </header>
 
-<nav>
-  <a href="/" class="nav-logo">VOX<span>5000</span></a>
-  <ul class="nav-links">
-    <li><a href="/#features">Features</a></li>
-    <li><a href="/#about">About</a></li>
-    <li><a href="/#different">Why Vox5000</a></li>
-    <li><a href="/#newsletter">Newsletter</a></li>
-    <li><a href="/record" class="nav-cta">Open recorder →</a></li>
-  </ul>
-</nav>
+  <div class="prose">
+    <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text2);text-decoration:none;margin-bottom:2rem;">← Back to recorder</a>
 
-<div class="page-header">
-  <div class="page-header-inner">
-    <div class="page-label">Privacy</div>
-    <h1>Your audio never leaves your device.</h1>
-    <p>Vox5000 was built on a simple principle: your recordings belong to you and nobody else.</p>
-  </div>
-</div>
+    <h1 style="font-size:28px;font-weight:600;letter-spacing:-0.03em;color:var(--text);margin-bottom:0.5rem;">Privacy Policy</h1>
+    <p class="effective">Effective date: June 2026 · Operated by Vox5000</p>
 
-<div class="content">
+    <div class="highlight-box">
+      <p>The short version: Vox5000 does not store your audio on any server. Solo recordings stay entirely on your device. In interview rooms, audio transfers directly between participant browsers — peer to peer. Vox5000 never sees your audio.</p>
+    </div>
 
-  <div class="highlight-box">
-    <p><strong>The short version:</strong> Solo recordings are entirely local to your device. In interview rooms, audio transfers peer to peer between participants. Vox5000 never stores, processes, or has access to any of your audio.</p>
-    <p>We do not run advertising. We do not sell data. We do not track you across other sites.</p>
-  </div>
+    <h2>Who we are</h2>
+    <p>Vox5000 (vox5000.com) is a free browser-based audio recording tool built for radio presenters, journalists, podcasters and voice over artists.</p>
 
-  <div class="privacy-section">
-    <h2>Audio and recordings</h2>
-    <p><strong>Solo recordings</strong> are captured entirely within your browser using the Web Audio API. No audio data is sent to any server at any point. The file is written directly to your device when you stop recording.</p>
-    <p><strong>Interview room recordings</strong> work the same way for each participant. Every person records locally on their own device. At the end of a session, guest tracks are transferred directly to the host using a peer to peer connection. Vox5000's servers are not involved in this transfer and never receive, store, or process any audio.</p>
-  </div>
+    <h2>How audio recording works — two different modes</h2>
 
-  <div class="privacy-section">
-    <h2>Consent logs</h2>
-    <p>When guests join an interview room, they are asked to confirm consent to being recorded. A consent log is generated locally by the host and downloaded as a text file at the end of the session. This log is stored on the host's device only. Vox5000 does not retain copies of consent logs.</p>
-    <p>The log includes each participant's name as entered, their role (host or guest), consent status, timestamp, and browser information.</p>
-    <p>IP addresses are not collected or logged.</p>
-  </div>
+    <div class="mode-box">
+      <div class="mode-title">Solo Recording Mode</div>
+      <p style="font-size:14px;color:#bbb;margin:0;line-height:1.6;">Your audio is recorded entirely within your browser on your own device. No audio data is sent to any server at any point. When you click download, the file goes directly from your browser to your computer. Vox5000 never receives, sees, or stores your audio.</p>
+    </div>
 
-  <div class="privacy-section">
-    <h2>Room data</h2>
-    <p>Interview rooms are stored in your browser's local storage on your device. Room data includes the room name, creation date, and guest invite link. This data never leaves your browser and is not synced to any server. Clearing your browser data or using incognito mode will remove saved rooms.</p>
-  </div>
+    <div class="mode-box">
+      <div class="mode-title">Interview Room Mode</div>
+      <p style="font-size:14px;color:#bbb;margin:0 0 8px;line-height:1.6;">Each participant records audio locally on their own device. When the host stops recording, guest audio is transferred directly from each guest's browser to the host's browser using peer-to-peer technology (WebRTC). This transfer does not pass through Vox5000's servers. Vox5000 does not receive, store, or process any audio from interview sessions.</p>
+      <p style="font-size:14px;color:#bbb;margin:0;line-height:1.6;">The host receives the audio files directly in their browser and downloads them to their device. Guest audio does not go to the cloud unless the host subsequently uploads it themselves.</p>
+    </div>
 
-  <div class="privacy-section">
-    <h2>Website analytics</h2>
-    <p>Vox5000 may use privacy respecting analytics to understand general usage patterns such as which pages are visited and how long sessions last. No personally identifiable information is collected. No individual user profiles are built. No data is sold or shared with third parties for advertising purposes.</p>
-  </div>
-
-  <div class="privacy-section">
-    <h2>Newsletter</h2>
-    <p>If you subscribe to the Vox5000 newsletter, your email address is stored by Beehiiv, our newsletter platform. You can unsubscribe at any time using the link in any newsletter email. We do not share your email address with any third party.</p>
-  </div>
-
-  <div class="privacy-section">
-    <h2>Cookies</h2>
-    <p>Vox5000 uses only functional cookies necessary for the site to operate. We do not use advertising cookies or third party tracking cookies.</p>
-  </div>
-
-  <div class="privacy-section">
-    <h2>Contact</h2>
-    <p>If you have any questions about this privacy policy or how Vox5000 handles your data, you can reach us at <strong>hello@vox5000.com</strong>.</p>
-  </div>
-
-</div>
-
-<footer>
-  <div class="footer-inner">
-    <div class="footer-logo">VOX<span>5000</span></div>
-    <p class="footer-note">Solo recordings never leave your device · Interview audio is peer to peer</p>
-    <ul class="footer-links">
-      <li><a href="help.html">Help</a></li>
-      <li><a href="privacy.html">Privacy</a></li>
+    <h2>Consent logs in interview rooms</h2>
+    <p>When a participant joins an interview room, the following information is collected and stored locally in the host's browser session only:</p>
+    <ul>
+      <li>Participant name (as entered by the participant)</li>
+      <li>Whether they consented to recording or joined as an Observer</li>
+      <li>Date and time of joining</li>
+      <li>Browser user agent</li>
     </ul>
-  </div>
-</footer>
+    <p>This data is <strong>not sent to Vox5000's servers</strong>. It is stored only in the host's browser session and is downloaded by the host as a local text file when the session ends. The host is responsible for retaining and protecting this consent record in accordance with applicable data protection laws.</p>
+    <p>Vox5000 does not receive, store, or have access to consent logs.</p>
 
+    <h2>What Vox5000 does collect</h2>
+    <p>When your browser loads vox5000.com, standard web server access logs are created. These may include your IP address, browser type, referring page and pages visited. These logs are retained for no more than 30 days and are used only for security and performance monitoring. This is standard behaviour for any website.</p>
+
+    <h2>Cookies and tracking</h2>
+    <p>Vox5000 does not use tracking cookies. We use Vercel Web Analytics to understand basic site usage, such as page views, referrers, devices and browsers. Vercel Web Analytics is used for site performance and product improvement only. It does not record audio, microphone input, chat messages, consent logs, downloaded files or the contents of any recording session.</p>
+
+    <h2>Google AdSense</h2>
+    <p>Vox5000 may display advertisements served by Google AdSense. Google uses cookies to serve ads based on your prior visits to our site and other sites. You can opt out at <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google's ad settings</a>. Google's use of advertising cookies is governed by <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</p>
+
+    <h2>Third-party services</h2>
+    <p>Vox5000 loads fonts from Google Fonts, PeerJS from unpkg.com for WebRTC signalling, lamejs from cdnjs for optional MP3 export, and Vercel Web Analytics for privacy-conscious page view analytics. Interview rooms may also use a TURN relay provider if configured, to help participants connect on restrictive networks. These services may log your IP address as a standard part of serving files, measuring page views or relaying encrypted WebRTC traffic. PeerJS and TURN services facilitate connection setup or relay transport but do not store your recordings.</p>
+
+    <h2>Your privacy rights</h2>
+    <p>Because Vox5000 does not store personal information beyond standard server logs, there is in practice very little personal information for us to hold. If you believe we hold personal information about you and wish to request access, correction, or deletion, contact us at the address below.</p>
+
+    <h2>Your rights under GDPR</h2>
+    <p>If you are located in the European Economic Area, you have rights under GDPR including the right to access, correct or erase personal data we hold. Contact us if you have questions.</p>
+
+    <h2>Children</h2>
+    <p>Vox5000 is not directed at children under the age of 13. We do not knowingly collect information from children.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If we make material changes, we will update the effective date at the top of this page. Continued use of Vox5000 after changes are posted constitutes acceptance of the updated policy.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy: <a href="mailto:privacy@vox5000.com">privacy@vox5000.com</a></p>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Vox5000 · <a href="/" style="color:var(--text3);">Back to recorder</a> · <a href="/privacy" style="color:var(--text3);">Privacy Policy</a></span>
+    </div>
+  </footer>
 </body>
 </html>

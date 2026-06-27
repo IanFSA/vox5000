@@ -178,7 +178,7 @@ function setupNav() {
     el.addEventListener('click', e => {
       e.preventDefault();
       if (recording && !confirm('Recording is active. Leaving will stop it. Continue?')) return;
-      window.location.href = 'index.html';
+      window.location.href = '/';
     });
   });
 }
@@ -737,7 +737,7 @@ function showThankyou(msg) {
   const iv = setInterval(() => {
     count--;
     setText($('thankyouCountdown'), count);
-    if (count <= 0) { clearInterval(iv); window.location.href = 'index.html'; }
+    if (count <= 0) { clearInterval(iv); window.location.href = '/'; }
   }, 1000);
 }
 
@@ -1448,7 +1448,7 @@ function setupSettingsPanel() {
 // ── Host controls ──
 function setupHostControls() {
   const copyBtn = $('copyLinkBtn');
-  if (copyBtn) copyBtn.addEventListener('click', () => openSharePanel(`${location.origin}/room.html?r=${encodeURIComponent(roomId)}`));
+  if (copyBtn) copyBtn.addEventListener('click', () => openSharePanel(`${location.origin}/room?r=${encodeURIComponent(roomId)}`));
 
   const renameBtn = $('renameRoomBtn');
   if (renameBtn) renameBtn.addEventListener('click', () => {
@@ -1467,7 +1467,7 @@ function setupHostControls() {
     if (confirm('Delete this room? This cannot be undone.')) {
       const r = getRooms(); delete r[roomId]; saveRooms(r);
       broadcastToGuests({ type: 'chat', sender: 'System', text: 'The host has ended this session.' });
-      setTimeout(() => { window.location.href = 'index.html'; }, 800);
+      setTimeout(() => { window.location.href = '/'; }, 800);
     }
   });
 
