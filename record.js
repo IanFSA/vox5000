@@ -843,16 +843,18 @@ function drawOverview() {
   overviewCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
   const w = rect.width;
   const h = rect.height;
+  const rulerHeight = Math.min(18, Math.max(14, h * 0.34));
+  const rulerTop = h - rulerHeight;
   overviewCtx.fillStyle = '#111';
   overviewCtx.fillRect(0, 0, w, h);
 
-  overviewCtx.fillStyle = '#e9e9e9';
-  overviewCtx.fillRect(0, h - 24, w, 24);
-  overviewCtx.strokeStyle = '#8a8a8a';
+  overviewCtx.fillStyle = '#0a0a0a';
+  overviewCtx.fillRect(0, rulerTop, w, rulerHeight);
+  overviewCtx.strokeStyle = '#2b2b2b';
   overviewCtx.lineWidth = 1;
   overviewCtx.beginPath();
-  overviewCtx.moveTo(0, h - 24);
-  overviewCtx.lineTo(w, h - 24);
+  overviewCtx.moveTo(0, rulerTop);
+  overviewCtx.lineTo(w, rulerTop);
   overviewCtx.stroke();
 
   if (!buffer) {
@@ -863,8 +865,8 @@ function drawOverview() {
   }
 
   const data = mixToMono(buffer);
-  const top = 4;
-  const waveHeight = h - 34;
+  const top = 3;
+  const waveHeight = Math.max(8, h - rulerHeight - 7);
   const mid = top + waveHeight / 2;
   const step = Math.max(1, Math.floor(data.length / Math.max(1, w)));
   overviewCtx.fillStyle = '#00ff38';
@@ -881,26 +883,26 @@ function drawOverview() {
   }
 
   const rulerStep = buffer.duration <= 30 ? 5 : buffer.duration <= 120 ? 15 : 60;
-  overviewCtx.fillStyle = '#252525';
-  overviewCtx.font = '14px JetBrains Mono, monospace';
+  overviewCtx.fillStyle = '#777';
+  overviewCtx.font = '12px JetBrains Mono, monospace';
   for (let seconds = 0; seconds <= buffer.duration; seconds += rulerStep) {
     const x = (seconds / buffer.duration) * w;
     overviewCtx.strokeStyle = '#9b9b9b';
     overviewCtx.beginPath();
-    overviewCtx.moveTo(x, h - 24);
+    overviewCtx.moveTo(x, rulerTop);
     overviewCtx.lineTo(x, h);
     overviewCtx.stroke();
-    overviewCtx.fillText(fmtTimeline(seconds), x + 4, h - 6);
+    overviewCtx.fillText(fmtTimeline(seconds), x + 4, h - 5);
   }
 
   const viewDuration = visibleDuration();
   const x1 = (visibleStart / buffer.duration) * w;
   const x2 = ((visibleStart + viewDuration) / buffer.duration) * w;
   overviewCtx.fillStyle = 'rgba(214, 105, 255, 0.18)';
-  overviewCtx.fillRect(x1, 0, Math.max(3, x2 - x1), h);
+  overviewCtx.fillRect(x1, top, Math.max(3, x2 - x1), waveHeight);
   overviewCtx.strokeStyle = '#c76bff';
-  overviewCtx.lineWidth = 3;
-  overviewCtx.strokeRect(x1, 1, Math.max(3, x2 - x1), h - 3);
+  overviewCtx.lineWidth = 2;
+  overviewCtx.strokeRect(x1, top + 1, Math.max(3, x2 - x1), Math.max(3, waveHeight - 2));
 
   const playX = (currentPlayhead() / buffer.duration) * w;
   overviewCtx.strokeStyle = '#dfff00';
