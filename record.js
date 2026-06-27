@@ -17,6 +17,9 @@ const els = {
   hint: $('timelineHint'),
   duration: $('durationText'),
   selection: $('selectionText'),
+  selectionStart: $('selectionStartText'),
+  selectionEnd: $('selectionEndText'),
+  selectionLength: $('selectionLengthText'),
   format: $('formatText'),
   undo: $('undoBtn'),
   redo: $('redoBtn'),
@@ -58,6 +61,7 @@ let dragging = false;
 let dragStart = 0;
 let undoStack = [];
 let redoStack = [];
+let zoom = 1;
 
 const canvasCtx = els.canvas ? els.canvas.getContext('2d') : null;
 
@@ -131,6 +135,9 @@ function updateControls() {
       ? `Selection: ${fmtTime(selection.start)} - ${fmtTime(selection.end)}`
       : 'Selection: none';
   }
+  if (els.selectionStart) els.selectionStart.textContent = hasSelection ? fmtTime(selection.start) : '--:--.---';
+  if (els.selectionEnd) els.selectionEnd.textContent = hasSelection ? fmtTime(selection.end) : '--:--.---';
+  if (els.selectionLength) els.selectionLength.textContent = hasSelection ? fmtTime(selection.end - selection.start) : '--:--.---';
   if (els.format) {
     els.format.textContent = buffer
       ? `${Math.round(buffer.sampleRate / 1000)} kHz · ${buffer.numberOfChannels} channel${buffer.numberOfChannels === 1 ? '' : 's'}`
@@ -215,7 +222,7 @@ async function startRecording() {
     clearInterval(timerId);
     inputGain.disconnect(dest);
     els.record.classList.remove('active');
-    els.record.innerHTML = '<span class="rec-dot" aria-hidden="true"></span> Record';
+    els.record.innerHTML = '<span class="record-dot"></span>';
     els.stop.disabled = true;
     const blob = new Blob(recordChunks, { type: 'audio/webm' });
     const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
@@ -228,7 +235,7 @@ async function startRecording() {
   recorder.start(500);
   recordStartedAt = Date.now();
   els.record.classList.add('active');
-  els.record.innerHTML = '<span class="rec-dot" aria-hidden="true"></span> Recording';
+  els.record.innerHTML = '<span class="record-dot"></span>';
   els.stop.disabled = false;
   setStatus('Recording');
   timerId = setInterval(() => {
@@ -257,7 +264,13 @@ function stopPlayback() {
     sourceNode = null;
   }
   cancelAnimationFrame(rafId);
-  if (els.play) els.play.textContent = 'Play';
+  if (els.play) els.play.textContent = '▶';
+}
+
+function clearSelection() {
+  selection = null;
+  updateControls();
+  drawWaveform();
 }
 
 function playPause() {
@@ -280,7 +293,7 @@ function playPause() {
     stopPlayback();
     drawWaveform();
   };
-  if (els.play) els.play.textContent = 'Pause';
+  if (els.play) els.play.textContent = 'Ⅱ';
   animatePlayhead();
 }
 
@@ -481,7 +494,8 @@ function redo() {
 function canvasPointToSeconds(event) {
   const rect = els.canvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-  return buffer ? (x / rect.width) * buffer.duration : 0;
+  const visibleDuration = buffer ? buffer.duration / zoom : 0;
+  return buffer ? Math.min(buffer.duration, (x / rect.width) * visibleDuration) : 0;
 }
 
 function drawWaveform() {
@@ -493,45 +507,81 @@ function drawWaveform() {
   canvasCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
   const w = rect.width;
   const h = rect.height;
-  canvasCtx.fillStyle = '#070707';
+  canvasCtx.fillStyle = '#030303';
   canvasCtx.fillRect(0, 0, w, h);
+
   canvasCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  canvasCtx.lineWidth = 1;
+  for (let i = 0; i <= 12; i++) {
+    const x = (i / 12) * w;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(x, 0);
+    canvasCtx.lineTo(x, h);
+    canvasCtx.stroke();
+  }
   canvasCtx.beginPath();
   canvasCtx.moveTo(0, h / 2);
   canvasCtx.lineTo(w, h / 2);
   canvasCtx.stroke();
+
   if (!buffer) return;
-  const data = buffer.getChannelData(0);
-  const step = Math.max(1, Math.floor(data.length / w));
-  canvasCtx.fillStyle = '#dfff00';
-  for (let x = 0; x < w; x++) {
-    const start = Math.floor(x * step);
-    let min = 1;
-    let max = -1;
-    for (let i = 0; i < step && start + i < data.length; i++) {
-      const v = data[start + i];
-      if (v < min) min = v;
-      if (v > max) max = v;
+
+  const visibleDuration = buffer.duration / zoom;
+  const visibleSamples = Math.max(1, Math.floor(buffer.length / zoom));
+  const laneHeight = h / 2;
+
+  function drawChannel(channelIndex, top) {
+    const data = buffer.getChannelData(Math.min(channelIndex, buffer.numberOfChannels - 1));
+    const step = Math.max(1, Math.floor(visibleSamples / w));
+    const mid = top + laneHeight / 2;
+    canvasCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(0, mid);
+    canvasCtx.lineTo(w, mid);
+    canvasCtx.stroke();
+
+    canvasCtx.fillStyle = '#bff8ff';
+    for (let x = 0; x < w; x++) {
+      const start = Math.floor(x * step);
+      let min = 1;
+      let max = -1;
+      for (let i = 0; i < step && start + i < data.length; i++) {
+        const v = data[start + i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      const y1 = mid - max * (laneHeight * 0.42);
+      const y2 = mid - min * (laneHeight * 0.42);
+      canvasCtx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
     }
-    const y1 = (1 - max) * h / 2;
-    const y2 = (1 - min) * h / 2;
-    canvasCtx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
   }
+
+  drawChannel(0, 0);
+  drawChannel(buffer.numberOfChannels > 1 ? 1 : 0, laneHeight);
+
   if (selection && selection.end > selection.start) {
-    const x1 = (selection.start / buffer.duration) * w;
-    const x2 = (selection.end / buffer.duration) * w;
-    canvasCtx.fillStyle = 'rgba(223,255,0,0.2)';
+    const x1 = (selection.start / visibleDuration) * w;
+    const x2 = (selection.end / visibleDuration) * w;
+    canvasCtx.fillStyle = 'rgba(111,75,150,0.52)';
     canvasCtx.fillRect(x1, 0, x2 - x1, h);
     canvasCtx.strokeStyle = '#dfff00';
     canvasCtx.strokeRect(x1, 0, x2 - x1, h);
   }
-  const playX = (currentPlayhead() / buffer.duration) * w;
+
+  const playX = (currentPlayhead() / visibleDuration) * w;
   canvasCtx.strokeStyle = '#ff3b3b';
   canvasCtx.lineWidth = 2;
   canvasCtx.beginPath();
   canvasCtx.moveTo(playX, 0);
   canvasCtx.lineTo(playX, h);
   canvasCtx.stroke();
+
+  canvasCtx.fillStyle = '#777';
+  canvasCtx.font = '11px JetBrains Mono, monospace';
+  for (let i = 0; i <= 10; i++) {
+    const seconds = (i / 10) * visibleDuration;
+    canvasCtx.fillText(fmtTime(seconds).slice(0, 5), (i / 10) * w + 3, 15);
+  }
 }
 
 function mixToMono(src) {
@@ -679,6 +729,45 @@ function bindEvents() {
       }
       updateControls();
       drawWaveform();
+    });
+  }
+
+  document.addEventListener('click', event => {
+    const action = event.target && event.target.dataset ? event.target.dataset.editorAction : '';
+    if (!action) return;
+    const actions = {
+      export: exportFile,
+      new: newSession,
+      undo,
+      redo,
+      trim: trimSelection,
+      delete: deleteSelection,
+      split: splitAtPlayhead,
+      normalize,
+      fadeIn,
+      fadeOut,
+      compress: compressVoice,
+      limit: limiter,
+      noise: noiseGate,
+      silence: removeSilence,
+      eq: applyEq,
+      start: () => { playOffset = 0; stopPlayback(); drawWaveform(); },
+      clearSelection,
+      zoomIn: () => { zoom = Math.min(8, zoom * 1.5); drawWaveform(); },
+      zoomOut: () => { zoom = Math.max(1, zoom / 1.5); drawWaveform(); },
+    };
+    if (actions[action]) actions[action]();
+  });
+
+  const stage = els.canvas ? els.canvas.parentElement : null;
+  if (stage) {
+    stage.addEventListener('dragover', event => {
+      event.preventDefault();
+    });
+    stage.addEventListener('drop', event => {
+      event.preventDefault();
+      const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+      importFile(file);
     });
   }
 

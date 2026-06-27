@@ -17,113 +17,149 @@
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
-<body>
-  <header class="header" role="banner">
-    <div class="header-inner">
-      <div class="logo">
-        <a href="/" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a>
-      </div>
-      <nav class="main-nav" aria-label="Main navigation">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/record" class="nav-link nav-active" aria-current="page">Record</a>
-        <a href="/help" class="nav-link">Help</a>
+<body class="editor-body">
+  <div class="editor-app" id="main-content">
+    <header class="editor-menubar" role="banner">
+      <a href="/" class="editor-logo" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" /></a>
+      <nav class="editor-menus" aria-label="Editor menus">
+        <div class="menu">
+          <button class="menu-btn">File</button>
+          <div class="menu-popover">
+            <label for="fileInput">Import audio</label>
+            <button data-editor-action="export">Export file</button>
+            <button data-editor-action="new">New session</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu-btn">Edit</button>
+          <div class="menu-popover">
+            <button data-editor-action="undo">Undo</button>
+            <button data-editor-action="redo">Redo</button>
+            <button data-editor-action="trim">Trim</button>
+            <button data-editor-action="delete">Delete selection</button>
+            <button data-editor-action="split">Split</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu-btn">Effects</button>
+          <div class="menu-popover">
+            <button data-editor-action="normalize">Normalize</button>
+            <button data-editor-action="fadeIn">Fade in</button>
+            <button data-editor-action="fadeOut">Fade out</button>
+            <button data-editor-action="compress">Compressor</button>
+            <button data-editor-action="limit">Hard limiter</button>
+            <button data-editor-action="noise">Noise gate</button>
+            <button data-editor-action="silence">Remove silence</button>
+            <button data-editor-action="eq">Apply EQ</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu-btn">View</button>
+          <div class="menu-popover">
+            <button data-editor-action="start">Go to start</button>
+            <button data-editor-action="clearSelection">Clear selection</button>
+          </div>
+        </div>
+        <a href="/help" class="menu-link">Help</a>
       </nav>
-      <a href="/room" class="nav-cta">Create room</a>
-    </div>
-  </header>
+      <a href="/room" class="editor-room-link">Create room</a>
+    </header>
 
-  <main class="editor-shell" id="main-content">
-    <section class="editor-hero" aria-label="Browser audio editor">
-      <div>
-        <p class="hero-eyebrow">Browser sound studio</p>
-        <h1 class="editor-title">Record, cut, process and export audio without leaving the browser.</h1>
+    <input id="fileInput" class="file-input" type="file" accept="audio/*" />
+
+    <section class="editor-toolbar" aria-label="Transport and editing controls">
+      <div class="time-stack">
+        <div class="time-display" id="timeDisplay">00:00.000</div>
+        <div class="time-sub" id="durationText">Duration: 00:00.000</div>
       </div>
-      <div class="editor-status" id="statusText" aria-live="polite">No audio loaded</div>
+
+      <div class="transport-group">
+        <button class="square-btn stop" id="stopBtn" disabled title="Stop">■</button>
+        <button class="square-btn play" id="playBtn" disabled title="Play or pause">▶</button>
+        <button class="square-btn" id="rewindBtn" disabled title="Go to start">|◀</button>
+        <button class="square-btn" id="recordBtn" title="Record"><span class="record-dot"></span></button>
+      </div>
+
+      <div class="tool-group">
+        <button class="square-btn" id="undoBtn" disabled title="Undo">↶</button>
+        <button class="square-btn" id="redoBtn" disabled title="Redo">↷</button>
+        <button class="square-btn" id="trimBtn" disabled title="Trim to selection">⟦⟧</button>
+        <button class="square-btn" id="deleteBtn" disabled title="Delete selection">✂</button>
+        <button class="square-btn" id="splitBtn" disabled title="Split">S</button>
+        <button class="square-btn" id="fadeInBtn" disabled title="Fade in">╱</button>
+        <button class="square-btn" id="fadeOutBtn" disabled title="Fade out">╲</button>
+      </div>
+
+      <div class="selection-stack">
+        <div class="selection-label">Selection</div>
+        <div class="selection-grid">
+          <span>Start</span><strong id="selectionStartText">--:--.---</strong>
+          <span>End</span><strong id="selectionEndText">--:--.---</strong>
+          <span>Duration</span><strong id="selectionLengthText">--:--.---</strong>
+        </div>
+      </div>
     </section>
 
-    <section class="studio-grid" aria-label="Audio editor workspace">
-      <aside class="studio-panel left-panel" aria-label="Input and file controls">
-        <div class="panel-title">Input</div>
-        <label class="field-label" for="micSelect">Microphone</label>
-        <select id="micSelect" class="select"><option value="">Allow mic access to choose input</option></select>
-
-        <div class="meter-wrap editor-meter" role="meter" aria-label="Input level meter">
-          <div class="meter-bar" id="meterBar"></div>
-          <div class="meter-peaks" aria-hidden="true"><span>-60</span><span>-24</span><span>-12</span><span>-6</span><span>0</span></div>
+    <section class="wave-editor" aria-label="Waveform editor">
+      <aside class="channel-strip" aria-label="Channel controls">
+        <div class="channel-label">L<br><span>ON</span></div>
+        <div class="channel-label">R<br><span>ON</span></div>
+        <div class="zoom-buttons" aria-label="Zoom controls">
+          <button data-editor-action="zoomIn">+</button>
+          <button data-editor-action="zoomOut">-</button>
+          <button data-editor-action="clearSelection">R</button>
         </div>
-
-        <div class="panel-title with-gap">File</div>
-        <input id="fileInput" class="file-input" type="file" accept="audio/*" />
-        <label for="fileInput" class="btn btn-ghost file-label">Import audio</label>
-        <button class="btn btn-ghost" id="newBtn">New blank session</button>
       </aside>
 
-      <section class="timeline-panel" aria-label="Waveform editor">
-        <div class="transport-bar" aria-label="Transport controls">
-          <button class="transport-btn record" id="recordBtn"><span class="rec-dot" aria-hidden="true"></span> Record</button>
-          <button class="transport-btn" id="stopBtn" disabled>Stop</button>
-          <button class="transport-btn" id="playBtn" disabled>Play</button>
-          <button class="transport-btn" id="rewindBtn" disabled>Start</button>
-          <div class="time-display" id="timeDisplay">00:00.000</div>
+      <div class="wave-stage">
+        <canvas id="waveCanvas" class="editor-waveform" height="520"></canvas>
+        <div class="timeline-hint" id="timelineHint">
+          Drag and drop an audio file here, or use File > Import audio.
         </div>
+      </div>
+    </section>
 
-        <div class="timeline-tools" aria-label="Editing tools">
-          <button class="tool-btn" id="undoBtn" disabled>Undo</button>
-          <button class="tool-btn" id="redoBtn" disabled>Redo</button>
-          <button class="tool-btn" id="trimBtn" disabled>Trim</button>
-          <button class="tool-btn" id="deleteBtn" disabled>Delete selection</button>
-          <button class="tool-btn" id="splitBtn" disabled>Split</button>
-          <button class="tool-btn" id="fadeInBtn" disabled>Fade in</button>
-          <button class="tool-btn" id="fadeOutBtn" disabled>Fade out</button>
+    <section class="editor-footerbar" aria-label="Processing, input and export">
+      <div class="footer-module input-module">
+        <label for="micSelect">Mic</label>
+        <select id="micSelect" class="compact-select"><option value="">Allow mic access</option></select>
+        <div class="mini-meter" role="meter" aria-label="Input level">
+          <div id="meterBar"></div>
         </div>
+      </div>
 
-        <div class="timeline-wrap">
-          <canvas id="waveCanvas" class="editor-waveform" height="260"></canvas>
-          <div class="timeline-hint" id="timelineHint">Record or import audio, then drag across the waveform to select a region.</div>
-        </div>
+      <div class="footer-module effects-module">
+        <button class="compact-btn" id="normalizeBtn" disabled>Normalize</button>
+        <button class="compact-btn" id="compressBtn" disabled>Compressor</button>
+        <button class="compact-btn" id="limitBtn" disabled>Limiter</button>
+        <button class="compact-btn" id="noiseBtn" disabled>Gate</button>
+        <button class="compact-btn" id="silenceBtn" disabled>Silence</button>
+      </div>
 
-        <div class="selection-readout">
-          <span id="durationText">Duration: 00:00.000</span>
-          <span id="selectionText">Selection: none</span>
-          <span id="formatText">48 kHz browser session</span>
-        </div>
-      </section>
+      <div class="footer-module eq-module">
+        <label for="lowEq">Low</label><input id="lowEq" type="range" min="-12" max="12" step="1" value="0" />
+        <label for="midEq">Mid</label><input id="midEq" type="range" min="-12" max="12" step="1" value="0" />
+        <label for="highEq">High</label><input id="highEq" type="range" min="-12" max="12" step="1" value="0" />
+        <button class="compact-btn" id="eqBtn" disabled>Apply EQ</button>
+      </div>
 
-      <aside class="studio-panel right-panel" aria-label="Processing and export controls">
-        <div class="panel-title">Process</div>
-        <button class="process-btn" id="normalizeBtn" disabled>Normalize</button>
-        <button class="process-btn" id="compressBtn" disabled>Compress voice</button>
-        <button class="process-btn" id="limitBtn" disabled>Limiter</button>
-        <button class="process-btn" id="noiseBtn" disabled>Noise gate</button>
-        <button class="process-btn" id="silenceBtn" disabled>Remove silence</button>
-
-        <div class="panel-title with-gap">EQ</div>
-        <label class="slider-label" for="lowEq">Low</label>
-        <input id="lowEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
-        <label class="slider-label" for="midEq">Mid</label>
-        <input id="midEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
-        <label class="slider-label" for="highEq">High</label>
-        <input id="highEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
-        <button class="process-btn" id="eqBtn" disabled>Apply EQ</button>
-
-        <div class="panel-title with-gap">Export</div>
-        <select id="exportFormat" class="select">
+      <div class="footer-module export-module">
+        <select id="exportFormat" class="compact-select">
           <option value="mp3">MP3 256 kbps</option>
           <option value="wav">WAV 16-bit</option>
         </select>
-        <button class="btn btn-record export-btn" id="exportBtn" disabled>Export file</button>
+        <button class="compact-btn export" id="exportBtn" disabled>Export</button>
+        <button class="compact-btn" id="newBtn">New</button>
         <div class="download-slot" id="downloadSlot" aria-live="polite"></div>
-      </aside>
+      </div>
     </section>
-  </main>
 
-  <footer class="footer" role="contentinfo">
-    <div class="footer-inner">
-      <span>© 2026 Vox5000</span>
-      <span class="footer-privacy-note">Audio stays in your browser until you export it.</span>
-      <a href="/privacy" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
+    <div class="editor-status-line">
+      <span id="statusText" aria-live="polite">No audio loaded</span>
+      <span id="formatText">48 kHz browser session</span>
+      <span id="selectionText">Selection: none</span>
     </div>
-  </footer>
+  </div>
 
   <script src="record.js"></script>
 </body>
