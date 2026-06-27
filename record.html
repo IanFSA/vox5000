@@ -18,30 +18,43 @@
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body class="editor-body">
-  <div class="editor-app" id="main-content">
+  <div class="editor-app wave-normal" id="main-content">
     <header class="editor-menubar" role="banner">
       <a href="/" class="editor-logo" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" /></a>
       <nav class="editor-menus" aria-label="Editor menus">
         <div class="menu">
-          <button class="menu-btn">File</button>
+          <button class="menu-btn" aria-expanded="false" type="button">File</button>
           <div class="menu-popover">
             <label for="fileInput">Import audio</label>
+            <button data-editor-action="newMono">New mono file</button>
+            <button data-editor-action="newStereo">New stereo file</button>
             <button data-editor-action="export">Export file</button>
             <button data-editor-action="new">New session</button>
           </div>
         </div>
         <div class="menu">
-          <button class="menu-btn">Edit</button>
+          <button class="menu-btn" aria-expanded="false" type="button">Edit</button>
           <div class="menu-popover">
             <button data-editor-action="undo">Undo</button>
             <button data-editor-action="redo">Redo</button>
+            <button data-editor-action="copy">Copy selection</button>
+            <button data-editor-action="paste">Paste</button>
             <button data-editor-action="trim">Trim</button>
             <button data-editor-action="delete">Delete selection</button>
             <button data-editor-action="split">Split</button>
           </div>
         </div>
         <div class="menu">
-          <button class="menu-btn">Effects</button>
+          <button class="menu-btn" aria-expanded="false" type="button">Audio</button>
+          <div class="menu-popover">
+            <button data-editor-action="recordMono">Record mono</button>
+            <button data-editor-action="recordStereo">Record stereo</button>
+            <button data-editor-action="newMono">New mono file</button>
+            <button data-editor-action="newStereo">New stereo file</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu-btn" aria-expanded="false" type="button">Effects</button>
           <div class="menu-popover">
             <button data-editor-action="normalize">Normalize</button>
             <button data-editor-action="fadeIn">Fade in</button>
@@ -54,13 +67,25 @@
           </div>
         </div>
         <div class="menu">
-          <button class="menu-btn">View</button>
+          <button class="menu-btn" aria-expanded="false" type="button">View</button>
           <div class="menu-popover">
             <button data-editor-action="start">Go to start</button>
             <button data-editor-action="clearSelection">Clear selection</button>
+            <button data-editor-action="zoomIn">Zoom in</button>
+            <button data-editor-action="zoomOut">Zoom out</button>
+            <button data-editor-action="zoomReset">Reset zoom</button>
+            <button data-editor-action="waveCompact">Compact waveform</button>
+            <button data-editor-action="waveNormal">Normal waveform</button>
+            <button data-editor-action="waveLarge">Large waveform</button>
           </div>
         </div>
-        <a href="/help" class="menu-link">Help</a>
+        <div class="menu">
+          <button class="menu-btn" aria-expanded="false" type="button">Help</button>
+          <div class="menu-popover">
+            <button data-editor-action="showShortcuts">Keyboard shortcuts</button>
+            <a href="/help">VOX5000 help</a>
+          </div>
+        </div>
       </nav>
       <a href="/room" class="editor-room-link">Create room</a>
     </header>
@@ -101,20 +126,27 @@
     </section>
 
     <section class="wave-editor" aria-label="Waveform editor">
-      <aside class="channel-strip" aria-label="Channel controls">
-        <div class="channel-label">L<br><span>ON</span></div>
-        <div class="channel-label">R<br><span>ON</span></div>
+      <aside class="channel-strip mono" id="channelScale" aria-label="Channel scale">
+        <span class="scale-label">6</span>
+        <span class="scale-label channel">1</span>
+        <span class="scale-label">6</span>
+        <span class="scale-label small">1x</span>
         <div class="zoom-buttons" aria-label="Zoom controls">
-          <button data-editor-action="zoomIn">+</button>
-          <button data-editor-action="zoomOut">-</button>
-          <button data-editor-action="clearSelection">R</button>
+          <button data-editor-action="zoomIn" title="Zoom in">+</button>
+          <button data-editor-action="zoomOut" title="Zoom out">−</button>
+          <button data-editor-action="zoomReset" title="Reset zoom">1x</button>
         </div>
       </aside>
 
-      <div class="wave-stage">
-        <canvas id="waveCanvas" class="editor-waveform" height="520"></canvas>
-        <div class="timeline-hint" id="timelineHint">
-          Drag and drop an audio file here, or use File > Import audio.
+      <div class="wave-area">
+        <div class="overview-stage" aria-label="Full file overview">
+          <canvas id="overviewCanvas" class="overview-waveform" height="86"></canvas>
+        </div>
+        <div class="wave-stage">
+          <canvas id="waveCanvas" class="editor-waveform" height="420"></canvas>
+          <div class="timeline-hint" id="timelineHint">
+            Drag and drop an audio file here, or use File > Import audio.
+          </div>
         </div>
       </div>
     </section>
@@ -158,6 +190,33 @@
       <span id="statusText" aria-live="polite">No audio loaded</span>
       <span id="formatText">48 kHz browser session</span>
       <span id="selectionText">Selection: none</span>
+    </div>
+
+    <div class="shortcut-modal" id="shortcutModal" hidden role="dialog" aria-modal="true" aria-labelledby="shortcutTitle">
+      <div class="shortcut-panel">
+        <div class="shortcut-head">
+          <div>
+            <p class="panel-kicker">Personal setup</p>
+            <h2 id="shortcutTitle">Keyboard shortcuts</h2>
+          </div>
+          <button class="square-btn" id="shortcutClose" type="button" aria-label="Close shortcuts">×</button>
+        </div>
+        <div class="shortcut-list" id="shortcutList">
+          <label><span>Play / pause</span><input data-shortcut-input="playPause" readonly /></label>
+          <label><span>Record</span><input data-shortcut-input="record" readonly /></label>
+          <label><span>Delete selection</span><input data-shortcut-input="deleteSelection" readonly /></label>
+          <label><span>Undo</span><input data-shortcut-input="undo" readonly /></label>
+          <label><span>Redo</span><input data-shortcut-input="redo" readonly /></label>
+          <label><span>Cut or split</span><input data-shortcut-input="cutSplit" readonly /></label>
+          <label><span>Copy selection</span><input data-shortcut-input="copy" readonly /></label>
+          <label><span>Paste</span><input data-shortcut-input="paste" readonly /></label>
+          <label><span>Add marker</span><input data-shortcut-input="marker" readonly /></label>
+        </div>
+        <div class="shortcut-actions">
+          <button class="compact-btn" id="shortcutReset" type="button">Reset defaults</button>
+          <button class="compact-btn export" id="shortcutSave" type="button">Save shortcuts</button>
+        </div>
+      </div>
     </div>
   </div>
 

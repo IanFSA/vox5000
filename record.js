@@ -40,6 +40,14 @@ const els = {
   exportFormat: $('exportFormat'),
   export: $('exportBtn'),
   download: $('downloadSlot'),
+  app: $('main-content'),
+  overview: $('overviewCanvas'),
+  channelScale: $('channelScale'),
+  shortcutModal: $('shortcutModal'),
+  shortcutList: $('shortcutList'),
+  shortcutClose: $('shortcutClose'),
+  shortcutReset: $('shortcutReset'),
+  shortcutSave: $('shortcutSave'),
 };
 
 let audioCtx;
@@ -59,11 +67,33 @@ let fileName = 'Vox5000';
 let selection = null;
 let dragging = false;
 let dragStart = 0;
+let dragStartX = 0;
+let dragPointerId = null;
+let selectionDragMoved = false;
+let overviewDragging = false;
 let undoStack = [];
 let redoStack = [];
 let zoom = 1;
+let visibleStart = 0;
+let desiredChannels = 1;
+let clipboardBuffer = null;
 
 const canvasCtx = els.canvas ? els.canvas.getContext('2d') : null;
+const overviewCtx = els.overview ? els.overview.getContext('2d') : null;
+const SHORTCUT_STORAGE_KEY = 'vox5000_editor_shortcuts_v1';
+const WAVE_SIZE_STORAGE_KEY = 'vox5000_editor_wave_size_v1';
+const defaultShortcuts = {
+  playPause: 'Space',
+  record: 'R',
+  deleteSelection: 'Delete',
+  undo: 'Ctrl+Z',
+  redo: 'Ctrl+Y',
+  cutSplit: 'Ctrl+X',
+  copy: 'Ctrl+C',
+  paste: 'Ctrl+V',
+  marker: 'M',
+};
+let shortcuts = loadShortcuts();
 
 function ensureAudioContext() {
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
@@ -83,6 +113,72 @@ function fmtTime(seconds) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
 }
 
+function fmtTimeline(seconds) {
+  seconds = Math.max(0, seconds || 0);
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}'${String(s).padStart(2, '0')}`;
+}
+
+function loadShortcuts() {
+  try {
+    return { ...defaultShortcuts, ...JSON.parse(localStorage.getItem(SHORTCUT_STORAGE_KEY) || '{}') };
+  } catch {
+    return { ...defaultShortcuts };
+  }
+}
+
+function saveShortcuts() {
+  localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(shortcuts));
+}
+
+function renderShortcuts() {
+  if (!els.shortcutList) return;
+  els.shortcutList.querySelectorAll('[data-shortcut-input]').forEach(input => {
+    input.value = shortcuts[input.dataset.shortcutInput] || '';
+  });
+}
+
+function eventToShortcut(event) {
+  const parts = [];
+  if (event.ctrlKey || event.metaKey) parts.push('Ctrl');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey && !['Shift', 'ShiftLeft', 'ShiftRight'].includes(event.key)) parts.push('Shift');
+  const keyMap = {
+    ' ': 'Space',
+    ArrowLeft: 'Left',
+    ArrowRight: 'Right',
+    ArrowUp: 'Up',
+    ArrowDown: 'Down',
+    Escape: 'Esc',
+  };
+  const key = keyMap[event.key] || (event.key.length === 1 ? event.key.toUpperCase() : event.key);
+  if (!['Control', 'Meta', 'Alt', 'Shift'].includes(key)) parts.push(key);
+  return parts.join('+');
+}
+
+function shortcutMatches(event, shortcut) {
+  if (!shortcut) return false;
+  return eventToShortcut(event).toLowerCase() === shortcut.toLowerCase();
+}
+
+function isTypingTarget(target) {
+  if (!target) return false;
+  const tag = target.tagName ? target.tagName.toLowerCase() : '';
+  return target.isContentEditable || ['input', 'textarea', 'select'].includes(tag);
+}
+
+function showShortcuts() {
+  renderShortcuts();
+  if (els.shortcutModal) els.shortcutModal.hidden = false;
+  const first = els.shortcutList ? els.shortcutList.querySelector('input') : null;
+  if (first) first.focus();
+}
+
+function closeShortcuts() {
+  if (els.shortcutModal) els.shortcutModal.hidden = true;
+}
+
 function secondsToSamples(seconds) {
   return Math.max(0, Math.min(buffer ? buffer.length : 0, Math.round(seconds * (buffer ? buffer.sampleRate : 48000))));
 }
@@ -98,6 +194,27 @@ function cloneBuffer(src) {
   return copy;
 }
 
+function createBlankBuffer(channels) {
+  const ctx = ensureAudioContext();
+  return ctx.createBuffer(channels, ctx.sampleRate, ctx.sampleRate);
+}
+
+function newChannelFile(channels) {
+  if (buffer) pushUndo();
+  desiredChannels = channels;
+  undoStack = [];
+  redoStack = [];
+  if (els.download) els.download.innerHTML = '';
+  setBuffer(createBlankBuffer(channels), channels === 1 ? 'Vox5000_mono' : 'Vox5000_stereo');
+  setStatus(channels === 1 ? 'New mono file ready' : 'New stereo file ready');
+}
+
+function setDesiredChannels(channels) {
+  desiredChannels = channels;
+  updateChannelScale();
+  setStatus(channels === 1 ? 'Recording set to mono' : 'Recording set to stereo where supported by your device');
+}
+
 function pushUndo() {
   if (!buffer) return;
   undoStack.push(cloneBuffer(buffer));
@@ -106,14 +223,90 @@ function pushUndo() {
   updateControls();
 }
 
+function visibleDuration() {
+  return buffer ? Math.max(0.05, buffer.duration / zoom) : 0;
+}
+
+function clampVisibleStart() {
+  if (!buffer) {
+    visibleStart = 0;
+    return;
+  }
+  const maxStart = Math.max(0, buffer.duration - visibleDuration());
+  visibleStart = Math.max(0, Math.min(maxStart, visibleStart));
+}
+
+function setZoom(nextZoom, anchorSeconds) {
+  if (!buffer) {
+    zoom = Math.max(1, Math.min(64, nextZoom));
+    drawWaveform();
+    return;
+  }
+  const oldDuration = visibleDuration();
+  const anchor = typeof anchorSeconds === 'number' ? anchorSeconds : currentPlayhead();
+  const anchorRatio = oldDuration ? (anchor - visibleStart) / oldDuration : 0.5;
+  zoom = Math.max(1, Math.min(64, nextZoom));
+  const nextDuration = visibleDuration();
+  visibleStart = anchor - anchorRatio * nextDuration;
+  clampVisibleStart();
+  drawWaveform();
+  drawOverview();
+  setStatus(zoom === 1 ? 'Zoom reset' : `Zoom ${zoom.toFixed(1)}x`);
+}
+
+function panViewport(deltaSeconds) {
+  if (!buffer) return;
+  visibleStart += deltaSeconds;
+  clampVisibleStart();
+  drawWaveform();
+  drawOverview();
+}
+
+function setWaveSize(size) {
+  if (!els.app) return;
+  els.app.classList.remove('wave-compact', 'wave-normal', 'wave-large');
+  els.app.classList.add(`wave-${size}`);
+  localStorage.setItem(WAVE_SIZE_STORAGE_KEY, size);
+  requestAnimationFrame(() => {
+    drawWaveform();
+    drawOverview();
+  });
+}
+
+function restoreWaveSize() {
+  const stored = localStorage.getItem(WAVE_SIZE_STORAGE_KEY);
+  if (['compact', 'normal', 'large'].includes(stored)) setWaveSize(stored);
+}
+
+function updateChannelScale() {
+  if (!els.channelScale) return;
+  const stereo = buffer ? buffer.numberOfChannels > 1 : desiredChannels > 1;
+  const labels = stereo ? ['6', 'L', '6', '6', 'R', '6', '1x'] : ['6', '1', '6', '1x'];
+  els.channelScale.classList.toggle('stereo', stereo);
+  els.channelScale.classList.toggle('mono', !stereo);
+  els.channelScale.innerHTML = labels.map(label => {
+    const className = label === 'L' || label === 'R' || label === '1' ? 'scale-label channel' : label === '1x' ? 'scale-label small' : 'scale-label';
+    return `<span class="${className}">${label}</span>`;
+  }).join('') + `
+    <div class="zoom-buttons" aria-label="Zoom controls">
+      <button data-editor-action="zoomIn" title="Zoom in">+</button>
+      <button data-editor-action="zoomOut" title="Zoom out">−</button>
+      <button data-editor-action="zoomReset" title="Reset zoom">1x</button>
+    </div>`;
+}
+
 function setBuffer(next, name) {
   buffer = next;
   fileName = name || fileName || 'Vox5000';
   selection = null;
   playOffset = 0;
+  visibleStart = 0;
+  zoom = 1;
+  if (buffer) desiredChannels = buffer.numberOfChannels > 1 ? 2 : 1;
   stopPlayback();
   updateControls();
   drawWaveform();
+  drawOverview();
   setStatus(buffer ? 'Audio loaded' : 'No audio loaded');
 }
 
@@ -144,6 +337,8 @@ function updateControls() {
       : '48 kHz browser session';
   }
   if (els.hint) els.hint.style.display = hasAudio ? 'none' : 'block';
+  updateChannelScale();
+  drawOverview();
 }
 
 async function initMics() {
@@ -177,7 +372,7 @@ async function startInput(deviceId) {
     audio: {
       deviceId: deviceId ? { exact: deviceId } : undefined,
       sampleRate: { ideal: 48000 },
-      channelCount: { ideal: 1 },
+      channelCount: { ideal: desiredChannels },
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
@@ -208,7 +403,11 @@ function drawInputMeter() {
 
 async function startRecording() {
   if (recorder && recorder.state === 'recording') return;
-  if (!inputStream) await initMics();
+  try {
+    await startInput(els.mic ? els.mic.value : '');
+  } catch {
+    setStatus('Allow microphone access to record');
+  }
   if (!inputStream) return;
   const ctx = ensureAudioContext();
   const dest = ctx.createMediaStreamDestination();
@@ -230,7 +429,9 @@ async function startRecording() {
     undoStack = buffer ? undoStack : [];
     redoStack = [];
     setBuffer(decoded, `Vox5000_${new Date().toISOString().slice(0, 16).replace('T', '_')}`);
-    setStatus('Recording loaded into editor');
+    setStatus(desiredChannels > 1 && decoded.numberOfChannels === 1
+      ? 'Recording loaded as mono. Your browser or input did not provide stereo.'
+      : 'Recording loaded into editor');
   };
   recorder.start(500);
   recordStartedAt = Date.now();
@@ -271,6 +472,7 @@ function clearSelection() {
   selection = null;
   updateControls();
   drawWaveform();
+  drawOverview();
 }
 
 function playPause() {
@@ -349,6 +551,48 @@ function deleteSelection() {
   }
   setBuffer(out, fileName);
   setStatus('Deleted selection');
+}
+
+function copySelection() {
+  const range = selectionSamples();
+  if (!range) {
+    setStatus('Select audio before copying');
+    return;
+  }
+  clipboardBuffer = copyRange(buffer, range.start, range.end);
+  setStatus('Selection copied');
+}
+
+function pasteClipboard() {
+  if (!buffer || !clipboardBuffer) {
+    setStatus('Nothing copied yet');
+    return;
+  }
+  pushUndo();
+  const ctx = ensureAudioContext();
+  const insertAt = secondsToSamples(playOffset);
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + clipboardBuffer.length, buffer.sampleRate);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const clip = clipboardBuffer.getChannelData(Math.min(ch, clipboardBuffer.numberOfChannels - 1));
+    const dst = out.getChannelData(ch);
+    dst.set(src.slice(0, insertAt), 0);
+    dst.set(clip, insertAt);
+    dst.set(src.slice(insertAt), insertAt + clipboardBuffer.length);
+  }
+  setBuffer(out, fileName);
+  playOffset = samplesToSeconds(insertAt + clipboardBuffer.length);
+  setStatus('Pasted audio');
+}
+
+function cutOrSplit() {
+  if (selection && selection.end > selection.start) {
+    copySelection();
+    deleteSelection();
+    setStatus('Cut selection');
+  } else {
+    splitAtPlayhead();
+  }
 }
 
 function splitAtPlayhead() {
@@ -494,12 +738,12 @@ function redo() {
 function canvasPointToSeconds(event) {
   const rect = els.canvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-  const visibleDuration = buffer ? buffer.duration / zoom : 0;
-  return buffer ? Math.min(buffer.duration, (x / rect.width) * visibleDuration) : 0;
+  return buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
 }
 
 function drawWaveform() {
   if (!els.canvas || !canvasCtx) return;
+  clampVisibleStart();
   const rect = els.canvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
   els.canvas.width = Math.max(1, Math.floor(rect.width * ratio));
@@ -526,13 +770,15 @@ function drawWaveform() {
 
   if (!buffer) return;
 
-  const visibleDuration = buffer.duration / zoom;
-  const visibleSamples = Math.max(1, Math.floor(buffer.length / zoom));
-  const laneHeight = h / 2;
+  const viewDuration = visibleDuration();
+  const visibleSamples = Math.max(1, Math.floor(viewDuration * buffer.sampleRate));
+  const sampleStart = Math.max(0, Math.floor(visibleStart * buffer.sampleRate));
+  const lanes = buffer.numberOfChannels > 1 ? 2 : 1;
+  const laneHeight = h / lanes;
 
   function drawChannel(channelIndex, top) {
     const data = buffer.getChannelData(Math.min(channelIndex, buffer.numberOfChannels - 1));
-    const step = Math.max(1, Math.floor(visibleSamples / w));
+    const step = Math.max(1, Math.floor(visibleSamples / Math.max(1, w)));
     const mid = top + laneHeight / 2;
     canvasCtx.strokeStyle = 'rgba(255,255,255,0.08)';
     canvasCtx.beginPath();
@@ -542,7 +788,7 @@ function drawWaveform() {
 
     canvasCtx.fillStyle = '#bff8ff';
     for (let x = 0; x < w; x++) {
-      const start = Math.floor(x * step);
+      const start = sampleStart + Math.floor(x * step);
       let min = 1;
       let max = -1;
       for (let i = 0; i < step && start + i < data.length; i++) {
@@ -557,31 +803,112 @@ function drawWaveform() {
   }
 
   drawChannel(0, 0);
-  drawChannel(buffer.numberOfChannels > 1 ? 1 : 0, laneHeight);
+  if (lanes > 1) drawChannel(1, laneHeight);
 
   if (selection && selection.end > selection.start) {
-    const x1 = (selection.start / visibleDuration) * w;
-    const x2 = (selection.end / visibleDuration) * w;
+    const x1 = ((selection.start - visibleStart) / viewDuration) * w;
+    const x2 = ((selection.end - visibleStart) / viewDuration) * w;
+    const left = Math.max(0, Math.min(w, x1));
+    const right = Math.max(0, Math.min(w, x2));
     canvasCtx.fillStyle = 'rgba(111,75,150,0.52)';
-    canvasCtx.fillRect(x1, 0, x2 - x1, h);
+    canvasCtx.fillRect(left, 0, Math.max(0, right - left), h);
     canvasCtx.strokeStyle = '#dfff00';
-    canvasCtx.strokeRect(x1, 0, x2 - x1, h);
+    canvasCtx.strokeRect(left, 0, Math.max(0, right - left), h);
   }
 
-  const playX = (currentPlayhead() / visibleDuration) * w;
-  canvasCtx.strokeStyle = '#ff3b3b';
-  canvasCtx.lineWidth = 2;
-  canvasCtx.beginPath();
-  canvasCtx.moveTo(playX, 0);
-  canvasCtx.lineTo(playX, h);
-  canvasCtx.stroke();
+  const playX = ((currentPlayhead() - visibleStart) / viewDuration) * w;
+  if (playX >= 0 && playX <= w) {
+    canvasCtx.strokeStyle = '#ff3b3b';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(playX, 0);
+    canvasCtx.lineTo(playX, h);
+    canvasCtx.stroke();
+  }
 
   canvasCtx.fillStyle = '#777';
   canvasCtx.font = '11px JetBrains Mono, monospace';
   for (let i = 0; i <= 10; i++) {
-    const seconds = (i / 10) * visibleDuration;
-    canvasCtx.fillText(fmtTime(seconds).slice(0, 5), (i / 10) * w + 3, 15);
+    const seconds = visibleStart + (i / 10) * viewDuration;
+    canvasCtx.fillText(fmtTimeline(seconds), (i / 10) * w + 3, 15);
   }
+}
+
+function drawOverview() {
+  if (!els.overview || !overviewCtx) return;
+  const rect = els.overview.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  els.overview.width = Math.max(1, Math.floor(rect.width * ratio));
+  els.overview.height = Math.max(1, Math.floor(rect.height * ratio));
+  overviewCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const w = rect.width;
+  const h = rect.height;
+  overviewCtx.fillStyle = '#111';
+  overviewCtx.fillRect(0, 0, w, h);
+
+  overviewCtx.fillStyle = '#e9e9e9';
+  overviewCtx.fillRect(0, h - 24, w, 24);
+  overviewCtx.strokeStyle = '#8a8a8a';
+  overviewCtx.lineWidth = 1;
+  overviewCtx.beginPath();
+  overviewCtx.moveTo(0, h - 24);
+  overviewCtx.lineTo(w, h - 24);
+  overviewCtx.stroke();
+
+  if (!buffer) {
+    overviewCtx.fillStyle = '#777';
+    overviewCtx.font = '12px JetBrains Mono, monospace';
+    overviewCtx.fillText('No audio loaded', 12, 28);
+    return;
+  }
+
+  const data = mixToMono(buffer);
+  const top = 4;
+  const waveHeight = h - 34;
+  const mid = top + waveHeight / 2;
+  const step = Math.max(1, Math.floor(data.length / Math.max(1, w)));
+  overviewCtx.fillStyle = '#00ff38';
+  for (let x = 0; x < w; x++) {
+    const start = Math.floor(x * step);
+    let min = 1;
+    let max = -1;
+    for (let i = 0; i < step && start + i < data.length; i++) {
+      const v = data[start + i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    overviewCtx.fillRect(x, mid - max * waveHeight * 0.44, 1, Math.max(1, (max - min) * waveHeight * 0.44));
+  }
+
+  const rulerStep = buffer.duration <= 30 ? 5 : buffer.duration <= 120 ? 15 : 60;
+  overviewCtx.fillStyle = '#252525';
+  overviewCtx.font = '14px JetBrains Mono, monospace';
+  for (let seconds = 0; seconds <= buffer.duration; seconds += rulerStep) {
+    const x = (seconds / buffer.duration) * w;
+    overviewCtx.strokeStyle = '#9b9b9b';
+    overviewCtx.beginPath();
+    overviewCtx.moveTo(x, h - 24);
+    overviewCtx.lineTo(x, h);
+    overviewCtx.stroke();
+    overviewCtx.fillText(fmtTimeline(seconds), x + 4, h - 6);
+  }
+
+  const viewDuration = visibleDuration();
+  const x1 = (visibleStart / buffer.duration) * w;
+  const x2 = ((visibleStart + viewDuration) / buffer.duration) * w;
+  overviewCtx.fillStyle = 'rgba(214, 105, 255, 0.18)';
+  overviewCtx.fillRect(x1, 0, Math.max(3, x2 - x1), h);
+  overviewCtx.strokeStyle = '#c76bff';
+  overviewCtx.lineWidth = 3;
+  overviewCtx.strokeRect(x1, 1, Math.max(3, x2 - x1), h - 3);
+
+  const playX = (currentPlayhead() / buffer.duration) * w;
+  overviewCtx.strokeStyle = '#dfff00';
+  overviewCtx.lineWidth = 2;
+  overviewCtx.beginPath();
+  overviewCtx.moveTo(playX, 0);
+  overviewCtx.lineTo(playX, h);
+  overviewCtx.stroke();
 }
 
 function mixToMono(src) {
@@ -594,28 +921,33 @@ function mixToMono(src) {
 }
 
 function encodeWav(src) {
-  const samples = mixToMono(src);
-  const byteRate = src.sampleRate * 2;
-  const bufferOut = new ArrayBuffer(44 + samples.length * 2);
+  const channels = src.numberOfChannels;
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  const byteRate = src.sampleRate * blockAlign;
+  const dataSize = src.length * blockAlign;
+  const bufferOut = new ArrayBuffer(44 + dataSize);
   const view = new DataView(bufferOut);
   const write = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); };
   write(0, 'RIFF');
-  view.setUint32(4, 36 + samples.length * 2, true);
+  view.setUint32(4, 36 + dataSize, true);
   write(8, 'WAVE');
   write(12, 'fmt ');
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
+  view.setUint16(22, channels, true);
   view.setUint32(24, src.sampleRate, true);
   view.setUint32(28, byteRate, true);
-  view.setUint16(32, 2, true);
+  view.setUint16(32, blockAlign, true);
   view.setUint16(34, 16, true);
   write(36, 'data');
-  view.setUint32(40, samples.length * 2, true);
+  view.setUint32(40, dataSize, true);
   let offset = 44;
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  for (let i = 0; i < src.length; i++) {
+    for (let ch = 0; ch < channels; ch++, offset += 2) {
+      const s = Math.max(-1, Math.min(1, src.getChannelData(ch)[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
   }
   return new Blob([bufferOut], { type: 'audio/wav' });
 }
@@ -630,17 +962,26 @@ async function encodeMp3(src) {
       document.head.appendChild(script);
     });
   }
-  const samples = mixToMono(src);
-  const encoder = new lamejs.Mp3Encoder(1, src.sampleRate, 256);
+  const channels = src.numberOfChannels > 1 ? 2 : 1;
+  const left = src.getChannelData(0);
+  const right = channels > 1 ? src.getChannelData(1) : left;
+  const encoder = new lamejs.Mp3Encoder(channels, src.sampleRate, 256);
   const block = 1152;
-  const int16 = new Int16Array(samples.length);
   const chunks = [];
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-  }
-  for (let i = 0; i < int16.length; i += block) {
-    const encoded = encoder.encodeBuffer(int16.subarray(i, i + block));
+  const toInt16 = data => {
+    const int16 = new Int16Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      const s = Math.max(-1, Math.min(1, data[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return int16;
+  };
+  const left16 = toInt16(left);
+  const right16 = channels > 1 ? toInt16(right) : null;
+  for (let i = 0; i < left16.length; i += block) {
+    const encoded = channels > 1
+      ? encoder.encodeBuffer(left16.subarray(i, i + block), right16.subarray(i, i + block))
+      : encoder.encodeBuffer(left16.subarray(i, i + block));
     if (encoded.length) chunks.push(new Int8Array(encoded));
   }
   const end = encoder.flush();
@@ -672,6 +1013,8 @@ function newSession() {
   buffer = null;
   selection = null;
   playOffset = 0;
+  visibleStart = 0;
+  zoom = 1;
   undoStack = [];
   redoStack = [];
   if (els.download) els.download.innerHTML = '';
@@ -679,6 +1022,96 @@ function newSession() {
   setStatus('No audio loaded');
   updateControls();
   drawWaveform();
+  drawOverview();
+}
+
+function closeMenus() {
+  document.querySelectorAll('.menu.open').forEach(menu => {
+    menu.classList.remove('open');
+    const button = menu.querySelector('.menu-btn');
+    if (button) button.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleMenu(menu) {
+  const wasOpen = menu.classList.contains('open');
+  closeMenus();
+  if (!wasOpen) {
+    menu.classList.add('open');
+    const button = menu.querySelector('.menu-btn');
+    if (button) button.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function finishWaveDrag(event) {
+  if (!dragging) return;
+  if (event && dragPointerId !== null) {
+    try { els.canvas.releasePointerCapture(dragPointerId); } catch {}
+  }
+  dragging = false;
+  dragPointerId = null;
+  selectionDragMoved = false;
+  if (els.canvas) els.canvas.classList.remove('is-selecting');
+}
+
+function handleWavePointerUp(event) {
+  if (!buffer || !dragging) return;
+  const point = canvasPointToSeconds(event);
+  if (!selectionDragMoved) {
+    selection = null;
+    playOffset = point;
+  } else if (!selection || Math.abs(selection.end - selection.start) < 0.05) {
+    selection = null;
+    playOffset = point;
+  }
+  finishWaveDrag(event);
+  updateControls();
+  drawWaveform();
+  drawOverview();
+}
+
+function overviewPointToSeconds(event) {
+  if (!buffer || !els.overview) return 0;
+  const rect = els.overview.getBoundingClientRect();
+  const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+  return (x / rect.width) * buffer.duration;
+}
+
+function moveViewportFromOverview(event) {
+  if (!buffer) return;
+  const center = overviewPointToSeconds(event);
+  visibleStart = center - visibleDuration() / 2;
+  clampVisibleStart();
+  drawWaveform();
+  drawOverview();
+}
+
+function handleEditorShortcut(event) {
+  if (event.key === 'Escape') {
+    closeMenus();
+    closeShortcuts();
+    finishWaveDrag(event);
+    return;
+  }
+  if (isTypingTarget(event.target)) return;
+  const actionByShortcut = [
+    ['playPause', playPause],
+    ['record', startRecording],
+    ['deleteSelection', deleteSelection],
+    ['undo', undo],
+    ['redo', redo],
+    ['cutSplit', cutOrSplit],
+    ['copy', copySelection],
+    ['paste', pasteClipboard],
+    ['marker', () => setStatus(`Marker noted at ${fmtTime(currentPlayhead())}`)],
+  ];
+  for (const [name, action] of actionByShortcut) {
+    if (shortcutMatches(event, shortcuts[name])) {
+      event.preventDefault();
+      action();
+      return;
+    }
+  }
 }
 
 function bindEvents() {
@@ -703,43 +1136,113 @@ function bindEvents() {
   if (els.undo) els.undo.addEventListener('click', undo);
   if (els.redo) els.redo.addEventListener('click', redo);
   if (els.export) els.export.addEventListener('click', exportFile);
+  if (els.shortcutClose) els.shortcutClose.addEventListener('click', closeShortcuts);
+  if (els.shortcutReset) els.shortcutReset.addEventListener('click', () => {
+    shortcuts = { ...defaultShortcuts };
+    saveShortcuts();
+    renderShortcuts();
+    setStatus('Shortcut defaults restored');
+  });
+  if (els.shortcutSave) els.shortcutSave.addEventListener('click', () => {
+    if (els.shortcutList) {
+      els.shortcutList.querySelectorAll('[data-shortcut-input]').forEach(input => {
+        shortcuts[input.dataset.shortcutInput] = input.value.trim();
+      });
+    }
+    saveShortcuts();
+    closeShortcuts();
+    setStatus('Shortcuts saved');
+  });
+  if (els.shortcutList) {
+    els.shortcutList.addEventListener('keydown', event => {
+      const input = event.target.closest('[data-shortcut-input]');
+      if (!input) return;
+      event.preventDefault();
+      input.value = eventToShortcut(event);
+    });
+  }
+
+  document.querySelectorAll('.menu-btn').forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      toggleMenu(button.closest('.menu'));
+    });
+  });
 
   if (els.canvas) {
     els.canvas.addEventListener('pointerdown', event => {
       if (!buffer) return;
+      event.preventDefault();
       dragging = true;
       dragStart = canvasPointToSeconds(event);
-      selection = { start: dragStart, end: dragStart };
+      dragStartX = event.clientX;
+      dragPointerId = event.pointerId;
+      selectionDragMoved = false;
       els.canvas.setPointerCapture(event.pointerId);
     });
     els.canvas.addEventListener('pointermove', event => {
       if (!buffer || !dragging) return;
+      if (!selectionDragMoved && Math.abs(event.clientX - dragStartX) < 4) return;
+      selectionDragMoved = true;
+      els.canvas.classList.add('is-selecting');
       const now = canvasPointToSeconds(event);
       selection = { start: Math.min(dragStart, now), end: Math.max(dragStart, now) };
       updateControls();
       drawWaveform();
+      drawOverview();
     });
-    els.canvas.addEventListener('pointerup', event => {
-      if (!buffer) return;
-      dragging = false;
-      const point = canvasPointToSeconds(event);
-      if (!selection || Math.abs(selection.end - selection.start) < 0.05) {
-        selection = null;
-        playOffset = point;
-      }
-      updateControls();
+    els.canvas.addEventListener('pointerup', handleWavePointerUp);
+    els.canvas.addEventListener('pointercancel', event => {
+      finishWaveDrag(event);
       drawWaveform();
+    });
+    els.canvas.addEventListener('lostpointercapture', finishWaveDrag);
+    els.canvas.addEventListener('wheel', event => {
+      if (!buffer) return;
+      event.preventDefault();
+      const rect = els.canvas.getBoundingClientRect();
+      const anchor = visibleStart + ((event.clientX - rect.left) / rect.width) * visibleDuration();
+      if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        panViewport((event.deltaX || event.deltaY) * visibleDuration() / Math.max(1, rect.width));
+      } else {
+        setZoom(event.deltaY < 0 ? zoom * 1.18 : zoom / 1.18, anchor);
+      }
+    }, { passive: false });
+  }
+
+  if (els.overview) {
+    els.overview.addEventListener('pointerdown', event => {
+      if (!buffer) return;
+      event.preventDefault();
+      overviewDragging = true;
+      els.overview.setPointerCapture(event.pointerId);
+      moveViewportFromOverview(event);
+    });
+    els.overview.addEventListener('pointermove', event => {
+      if (!overviewDragging) return;
+      moveViewportFromOverview(event);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
+      els.overview.addEventListener(type, () => { overviewDragging = false; });
     });
   }
 
   document.addEventListener('click', event => {
+    if (!event.target.closest('.menu')) closeMenus();
     const action = event.target && event.target.dataset ? event.target.dataset.editorAction : '';
     if (!action) return;
+    closeMenus();
     const actions = {
       export: exportFile,
       new: newSession,
+      newMono: () => newChannelFile(1),
+      newStereo: () => newChannelFile(2),
+      recordMono: () => { setDesiredChannels(1); startRecording(); },
+      recordStereo: () => { setDesiredChannels(2); startRecording(); },
       undo,
       redo,
+      copy: copySelection,
+      paste: pasteClipboard,
       trim: trimSelection,
       delete: deleteSelection,
       split: splitAtPlayhead,
@@ -753,8 +1256,13 @@ function bindEvents() {
       eq: applyEq,
       start: () => { playOffset = 0; stopPlayback(); drawWaveform(); },
       clearSelection,
-      zoomIn: () => { zoom = Math.min(8, zoom * 1.5); drawWaveform(); },
-      zoomOut: () => { zoom = Math.max(1, zoom / 1.5); drawWaveform(); },
+      zoomIn: () => setZoom(zoom * 1.4),
+      zoomOut: () => setZoom(zoom / 1.4),
+      zoomReset: () => setZoom(1),
+      waveCompact: () => setWaveSize('compact'),
+      waveNormal: () => setWaveSize('normal'),
+      waveLarge: () => setWaveSize('large'),
+      showShortcuts,
     };
     if (actions[action]) actions[action]();
   });
@@ -771,24 +1279,17 @@ function bindEvents() {
     });
   }
 
-  window.addEventListener('resize', drawWaveform);
-  document.addEventListener('keydown', event => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-      event.preventDefault();
-      event.shiftKey ? redo() : undo();
-    }
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
-      event.preventDefault();
-      redo();
-    }
-    if (event.code === 'Space' && buffer) {
-      event.preventDefault();
-      playPause();
-    }
+  window.addEventListener('resize', () => {
+    drawWaveform();
+    drawOverview();
   });
+  document.addEventListener('keydown', handleEditorShortcut);
 }
 
 bindEvents();
 initMics();
+restoreWaveSize();
+renderShortcuts();
 updateControls();
 drawWaveform();
+drawOverview();
