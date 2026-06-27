@@ -355,6 +355,7 @@ body {
   outline: none;
   white-space: nowrap;
   line-height: 1;
+  text-decoration: none;
 }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.28; cursor: not-allowed; pointer-events: none; }

@@ -3,27 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vox5000 — Solo Recorder</title>
-  <meta name="description" content="Record remote interviews without uploading your audio. Free browser-based WAV and MP3 recorder for radio presenters, journalists and podcasters." />
+  <title>Vox5000 — Browser Audio Editor</title>
+  <meta name="description" content="Record, import, edit, process and export voice audio in your browser. No account. No install. No cloud audio storage." />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="icon" sizes="512x512" href="favicon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="record.css" />
   <script>
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
-
   <header class="header" role="banner">
     <div class="header-inner">
       <div class="logo">
-        <a href="/" aria-label="Vox5000 home">
-          <img src="logo.png" alt="VOX5000" class="logo-img" />
-        </a>
+        <a href="/" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" class="logo-img" /></a>
       </div>
       <nav class="main-nav" aria-label="Main navigation">
         <a href="/" class="nav-link">Home</a>
@@ -34,244 +32,99 @@
     </div>
   </header>
 
-  <main class="main" id="main-content">
-
-    <!-- ── HERO ── -->
-    <section class="hero" aria-label="Introduction">
-      <p class="hero-eyebrow">Free · No account · No install</p>
-      <h1 class="hero-title">Record remote interviews without uploading your audio.</h1>
-      <p class="hero-sub">VOX5000 gives radio presenters, journalists and podcasters clean separate tracks from the browser. Record in WAV or MP3, keep files on your device, and send guests a simple interview link.</p>
-      <div class="hero-actions">
-        <button class="btn btn-record" id="soloModeBtn" aria-expanded="false" aria-controls="soloRecorder">
-          <span class="rec-dot" aria-hidden="true"></span>
-          Start solo recording
-        </button>
-        <a href="/room" class="btn btn-ghost">Create interview room</a>
+  <main class="editor-shell" id="main-content">
+    <section class="editor-hero" aria-label="Browser audio editor">
+      <div>
+        <p class="hero-eyebrow">Browser sound studio</p>
+        <h1 class="editor-title">Record, cut, process and export audio without leaving the browser.</h1>
       </div>
-      <!-- Guest join box -->
-      <div class="guest-join-box">
-        <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Been invited to a room?</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="joinCodeInput" placeholder="Paste your invite link or room code here" class="join-input" aria-label="Room invite link or code" />
-          <button class="btn btn-ghost" id="joinRoomBtn" style="white-space:nowrap;flex-shrink:0;">Join Room →</button>
-        </div>
-      </div>
-      <div class="hero-trust" role="list" aria-label="Product features">
-        <span role="listitem">No install</span>
-        <span role="listitem">No account</span>
-        <span role="listitem">Local first audio</span>
-        <span role="listitem">Separate guest tracks</span>
-      </div>
+      <div class="editor-status" id="statusText" aria-live="polite">No audio loaded</div>
     </section>
 
-    <!-- ── MODE CARDS ── -->
-    <section class="mode-cards" aria-label="Recording modes">
-      <div class="mode-card">
-        <div class="mode-card-icon" aria-hidden="true">🎙</div>
-        <h2 class="mode-card-title">Record myself</h2>
-        <p class="mode-card-desc">Capture voice tracks, links, show prep, auditions and quick pickups directly in the browser. Nothing leaves your device.</p>
-        <button class="mode-card-btn mode-card-btn-secondary" id="soloModeBtnCard">Start solo recording</button>
-      </div>
-      <div class="mode-card mode-card-featured">
-        <div class="mode-card-icon" aria-hidden="true">🎧</div>
-        <h2 class="mode-card-title">Record an interview</h2>
-        <p class="mode-card-desc">Create a room, invite guests with a link, collect consent and download separate WAV tracks when the session ends.</p>
-        <a href="/room" class="mode-card-btn mode-card-btn-primary">Create interview room</a>
-      </div>
-    </section>
+    <section class="studio-grid" aria-label="Audio editor workspace">
+      <aside class="studio-panel left-panel" aria-label="Input and file controls">
+        <div class="panel-title">Input</div>
+        <label class="field-label" for="micSelect">Microphone</label>
+        <select id="micSelect" class="select"><option value="">Allow mic access to choose input</option></select>
 
-    <!-- ── BROWSER WARNING ── -->
-    <div class="browser-warning" role="note" aria-label="Browser recommendation" id="browserWarning">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2L14 13H2L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.75" fill="currentColor"/></svg>
-      <span><strong>Best on Chrome desktop.</strong> Mobile Safari has limited recording support and may not work reliably for interviews.</span>
-    </div>
-
-    <!-- ── ERROR STATES ── -->
-    <div class="error-card" id="micDeniedError" style="display:none;" role="alert">
-      <div class="error-title">🚫 Microphone access denied</div>
-      <p class="error-text">Click the microphone or lock icon in your browser's address bar, choose Allow, then refresh this page.</p>
-    </div>
-    <div class="error-card" id="micNotFoundError" style="display:none;" role="alert">
-      <div class="error-title">🎤 No microphone found</div>
-      <p class="error-text">Make sure your USB or XLR interface mic is plugged in and recognised by your computer, then refresh the page.</p>
-    </div>
-
-    <!-- ── SOLO RECORDER (hidden until triggered) ── -->
-    <div id="soloRecorder" style="display:none;" aria-label="Solo recorder">
-
-      <div class="section-divider"><span>Solo Recorder</span></div>
-
-      <!-- Mic permission notice -->
-      <div class="notice-bar" id="permNotice" role="status">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor"/></svg>
-        Allow microphone access when your browser asks, then select your mic below.
-      </div>
-
-      <!-- Core controls -->
-      <section class="card" aria-label="Microphone and format">
-        <div class="card-label">Input & Format</div>
-        <div class="control-row">
-          <label for="micSelect" class="field-label">Mic</label>
-          <select id="micSelect" class="select"><option value="">Waiting for mic access…</option></select>
-        </div>
-        <div class="control-row">
-          <label for="formatSelect" class="field-label">Format</label>
-          <select id="formatSelect" class="select">
-            <option value="mp3">MP3 — compressed, great for delivery</option>
-            <option value="wav">WAV export — converted from recorded audio</option>
-          </select>
-        </div>
-        <div class="control-row">
-          <label for="qualitySelect" class="field-label">Quality</label>
-          <select id="qualitySelect" class="select"></select>
-        </div>
-        <div class="setup-footer">
-          <button class="btn btn-ghost btn-sm" id="testBtn" aria-label="Record a 5 second mic test and play it back">
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"><polygon points="3,2 11,7 3,12" fill="currentColor"/></svg>
-            5s mic test
-          </button>
-          <span style="font-size:12px;color:var(--text3);">Records and plays back to check your level and sound</span>
-        </div>
-      </section>
-
-      <!-- Record button and timer — big and obvious -->
-      <section class="card recorder-card" aria-label="Recording controls">
-        <div class="duration-display">
-          <span class="duration" id="duration" aria-live="polite" aria-label="Recording duration">00:00:00.0</span>
-          <span class="duration-status" id="durStatus" aria-live="polite">Ready to record</span>
-        </div>
-        <div class="controls">
-          <button class="btn btn-record" id="recBtn" aria-label="Start or stop recording">
-            <span class="rec-dot" aria-hidden="true"></span> Record
-          </button>
-          <button class="btn btn-ghost" id="pauseBtn" disabled aria-label="Pause or resume recording">⏸ Pause</button>
-        </div>
-        <div class="size-display" id="sizeDisplay" aria-live="polite"></div>
-      </section>
-
-      <!-- Waveform — always visible -->
-      <div class="waveform-section" aria-label="Live waveform monitor">
-        <div class="wave-header">
-          <span class="wave-title">Waveform Monitor</span>
-          <span class="wave-hint" aria-hidden="true">Scrolls during recording · Red = clipping</span>
-        </div>
-        <canvas id="waveCanvas" class="wave-canvas" height="100" aria-hidden="true"></canvas>
-      </div>
-
-      <!-- Audio settings — always visible, not hidden -->
-      <div class="card" id="audioSettingsCard">
-        <div class="card-label" style="margin-bottom:14px;">Audio Settings</div>
-
-        <div class="level-slider-row">
-          <label class="level-slider-label" for="inputGainSlider">Input Gain</label>
-          <input type="range" id="inputGainSlider" class="level-slider" min="-20" max="20" step="0.5" value="0" aria-label="Input gain" />
-          <span class="level-slider-val" id="inputGainVal">0 dB</span>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">How loud your mic is recorded · Double-click to reset</div>
-
-        <div class="level-slider-row">
-          <label class="level-slider-label" for="monitorSlider">Monitor</label>
-          <input type="range" id="monitorSlider" class="level-slider" min="-60" max="0" step="0.5" value="-60" aria-label="Monitor level" />
-          <span class="level-slider-val" id="monitorVal">Off</span>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:16px;padding-left:92px;">What you hear in headphones — doesn't affect recording</div>
-
-        <div class="meter-wrap" role="meter" aria-label="Input level meter">
+        <div class="meter-wrap editor-meter" role="meter" aria-label="Input level meter">
           <div class="meter-bar" id="meterBar"></div>
-          <div class="meter-peaks" aria-hidden="true"><span>–60</span><span>–24</span><span>–12</span><span>–6</span><span>0</span></div>
+          <div class="meter-peaks" aria-hidden="true"><span>-60</span><span>-24</span><span>-12</span><span>-6</span><span>0</span></div>
         </div>
-        <div style="font-size:10px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;">
-          <span style="color:var(--green);">● Safe: –24 to –6 dB</span>
-          <span style="color:var(--red);">● Clipping: above –6 dB</span>
-        </div>
-        <div class="clip-warn" id="clipWarn" style="display:none;margin-top:10px;" role="alert" aria-live="assertive">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2L13 12H1L7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.5" r="0.75" fill="currentColor"/></svg>
-          Clipping — reduce input gain
-        </div>
-      </div>
 
-      <!-- Downloads -->
-      <section class="card downloads" id="dlSection" aria-label="Download your recordings" aria-live="polite">
-        <div class="card-label">Downloads Ready</div>
-        <div class="dl-grid" id="dlGrid"></div>
+        <div class="panel-title with-gap">File</div>
+        <input id="fileInput" class="file-input" type="file" accept="audio/*" />
+        <label for="fileInput" class="btn btn-ghost file-label">Import audio</label>
+        <button class="btn btn-ghost" id="newBtn">New blank session</button>
+      </aside>
+
+      <section class="timeline-panel" aria-label="Waveform editor">
+        <div class="transport-bar" aria-label="Transport controls">
+          <button class="transport-btn record" id="recordBtn"><span class="rec-dot" aria-hidden="true"></span> Record</button>
+          <button class="transport-btn" id="stopBtn" disabled>Stop</button>
+          <button class="transport-btn" id="playBtn" disabled>Play</button>
+          <button class="transport-btn" id="rewindBtn" disabled>Start</button>
+          <div class="time-display" id="timeDisplay">00:00.000</div>
+        </div>
+
+        <div class="timeline-tools" aria-label="Editing tools">
+          <button class="tool-btn" id="undoBtn" disabled>Undo</button>
+          <button class="tool-btn" id="redoBtn" disabled>Redo</button>
+          <button class="tool-btn" id="trimBtn" disabled>Trim</button>
+          <button class="tool-btn" id="deleteBtn" disabled>Delete selection</button>
+          <button class="tool-btn" id="splitBtn" disabled>Split</button>
+          <button class="tool-btn" id="fadeInBtn" disabled>Fade in</button>
+          <button class="tool-btn" id="fadeOutBtn" disabled>Fade out</button>
+        </div>
+
+        <div class="timeline-wrap">
+          <canvas id="waveCanvas" class="editor-waveform" height="260"></canvas>
+          <div class="timeline-hint" id="timelineHint">Record or import audio, then drag across the waveform to select a region.</div>
+        </div>
+
+        <div class="selection-readout">
+          <span id="durationText">Duration: 00:00.000</span>
+          <span id="selectionText">Selection: none</span>
+          <span id="formatText">48 kHz browser session</span>
+        </div>
       </section>
 
-    </div>
+      <aside class="studio-panel right-panel" aria-label="Processing and export controls">
+        <div class="panel-title">Process</div>
+        <button class="process-btn" id="normalizeBtn" disabled>Normalize</button>
+        <button class="process-btn" id="compressBtn" disabled>Compress voice</button>
+        <button class="process-btn" id="limitBtn" disabled>Limiter</button>
+        <button class="process-btn" id="noiseBtn" disabled>Noise gate</button>
+        <button class="process-btn" id="silenceBtn" disabled>Remove silence</button>
 
-    <!-- ── HOW ROOMS WORK ── -->
-    <section class="how-it-works" id="howItWorks" aria-label="How interview rooms work">
-      <div class="hiw-title">How interview rooms work</div>
-      <div class="hiw-steps" role="list">
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">1</div><div class="hiw-text">Click Create interview room and enter your name</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">2</div><div class="hiw-text">Copy the invite link and send it to guests via WhatsApp or email</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">3</div><div class="hiw-text">Guests click the link, enter their name and consent to recording</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">4</div><div class="hiw-text">Admit guests from your waiting queue</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">5</div><div class="hiw-text">Hit Record — 5 second countdown on all screens, then everyone records locally</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">6</div><div class="hiw-text">Stop the session — guest tracks upload to you automatically</div></div>
-        <div class="hiw-step" role="listitem"><div class="hiw-num" aria-hidden="true">7</div><div class="hiw-text">Download separate WAV files clearly labelled with each person's name</div></div>
-      </div>
+        <div class="panel-title with-gap">EQ</div>
+        <label class="slider-label" for="lowEq">Low</label>
+        <input id="lowEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
+        <label class="slider-label" for="midEq">Mid</label>
+        <input id="midEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
+        <label class="slider-label" for="highEq">High</label>
+        <input id="highEq" class="editor-slider" type="range" min="-12" max="12" step="1" value="0" />
+        <button class="process-btn" id="eqBtn" disabled>Apply EQ</button>
+
+        <div class="panel-title with-gap">Export</div>
+        <select id="exportFormat" class="select">
+          <option value="mp3">MP3 256 kbps</option>
+          <option value="wav">WAV 16-bit</option>
+        </select>
+        <button class="btn btn-record export-btn" id="exportBtn" disabled>Export file</button>
+        <div class="download-slot" id="downloadSlot" aria-live="polite"></div>
+      </aside>
     </section>
-
-    <!-- ── TIPS ── -->
-    <section class="tips-section" aria-label="Broadcast quality tips">
-      <div class="tips-title">For best broadcast quality</div>
-      <ul class="tips-list">
-        <li>Always use wired headphones — Bluetooth adds latency and potential dropouts</li>
-        <li>Use an external USB or XLR interface mic — not your laptop's built-in mic</li>
-        <li>Keep the level meter peaking around –12 dB — never hitting 0 dB</li>
-        <li>If the waveform goes red, reduce input gain immediately</li>
-        <li>Monitor only affects what you hear — it does not change the recording</li>
-        <li>Do the 5s mic test before every session and check your sound</li>
-        <li>Use Chrome on a desktop or laptop for the most reliable experience</li>
-      </ul>
-    </section>
-
   </main>
 
   <footer class="footer" role="contentinfo">
     <div class="footer-inner">
       <span>© 2026 Vox5000</span>
-      <span class="footer-privacy-note">Solo recordings never leave your device. In interview rooms, audio transfers peer to peer — Vox5000 does not store audio on any server.</span>
+      <span class="footer-privacy-note">Audio stays in your browser until you export it.</span>
       <a href="/privacy" style="color:var(--text3);text-decoration:none;">Privacy Policy</a>
     </div>
   </footer>
 
-  <script src="app.js"></script>
-  <script>
-    // Solo mode toggle
-    const soloRecorder = document.getElementById('soloRecorder');
-    const howItWorks = document.getElementById('howItWorks');
-
-    function openSolo() {
-      soloRecorder.style.display = 'block';
-      howItWorks.style.display = 'none';
-      document.getElementById('soloModeBtn').setAttribute('aria-expanded','true');
-      soloRecorder.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    document.getElementById('soloModeBtn').addEventListener('click', openSolo);
-    document.getElementById('soloModeBtnCard').addEventListener('click', openSolo);
-
-    // Guest room join
-    function joinRoom() {
-      const val = document.getElementById('joinCodeInput').value.trim();
-      if (!val) { document.getElementById('joinCodeInput').focus(); return; }
-      let code = val;
-      try {
-        const url = new URL(val);
-        const r = url.searchParams.get('r');
-        if (r) code = r;
-      } catch(e) {
-        code = val.replace(/[^A-Za-z0-9]/g,'').toUpperCase().substr(0,8);
-      }
-      if (code) window.location.href = `/room?r=${code}`;
-    }
-    document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
-    document.getElementById('joinCodeInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') joinRoom();
-    });
-    window.addEventListener('DOMContentLoaded', () => {
-      openSolo();
-    });
-  </script>
+  <script src="record.js"></script>
 </body>
 </html>
