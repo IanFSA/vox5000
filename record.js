@@ -108,6 +108,8 @@ let playEndAt = 0;
 let playSelectionActive = false;
 let previewNode;
 let rafId;
+let scrubNode;
+let scrubTimeout = 0;
 let buffer = null;
 let fileName = 'Vox5000';
 let selection = null;
@@ -1007,8 +1009,9 @@ function playPause() {
   playStartedAt = ctx.currentTime;
   sourceNode.start(0, startAt, Math.max(0.01, endAt - startAt));
   sourceNode.onended = () => {
-    playOffset = playSelectionActive ? startAt : 0;
+    playOffset = startAt;
     stopPlayback();
+    if (els.time) els.time.textContent = fmtTime(playOffset);
     drawWaveform();
   };
   if (els.play) els.play.textContent = 'Ⅱ';
@@ -1019,6 +1022,45 @@ function playPause() {
 function currentPlayhead() {
   if (!sourceNode) return playOffset;
   return Math.min(playEndAt || (buffer ? buffer.duration : 0), playOffset + (ensureAudioContext().currentTime - playStartedAt));
+}
+
+function stopScrubPreview() {
+  clearTimeout(scrubTimeout);
+  if (!scrubNode) return;
+  try { scrubNode.stop(); } catch {}
+  try { scrubNode.disconnect(); } catch {}
+  scrubNode = null;
+}
+
+function playScrubPreview() {
+  if (!buffer) return;
+  stopScrubPreview();
+  const ctx = ensureAudioContext();
+  scrubNode = ctx.createBufferSource();
+  scrubNode.buffer = buffer;
+  scrubNode.connect(ctx.destination);
+  const start = Math.max(0, Math.min(buffer.duration - 0.02, playOffset));
+  const duration = Math.min(0.12, Math.max(0.02, buffer.duration - start));
+  scrubNode.start(0, start, duration);
+  scrubNode.onended = () => { scrubNode = null; };
+  scrubTimeout = setTimeout(stopScrubPreview, 160);
+}
+
+function nudgePlayhead(direction, event) {
+  if (!buffer) return;
+  const step = event.shiftKey ? 1 : event.altKey ? 0.01 : 0.1;
+  if (sourceNode) stopPlayback();
+  playOffset = Math.max(0, Math.min(buffer.duration, playOffset + direction * step));
+  if (els.time) els.time.textContent = fmtTime(playOffset);
+  if (settings.playbackScroll === 'continuous') {
+    if (playOffset < visibleStart || playOffset > visibleStart + visibleDuration()) {
+      visibleStart = Math.max(0, playOffset - visibleDuration() / 2);
+      clampVisibleStart();
+    }
+  }
+  drawWaveform();
+  drawOverview();
+  playScrubPreview();
 }
 
 function animatePlayhead() {
@@ -1456,11 +1498,11 @@ function compressVoice() {
     title: 'Compressor',
     copy: 'Control loud peaks without crushing the track. Start gently, then adjust threshold and ratio.',
     fields: [
-      { name: 'thresholdDb', label: 'Threshold dB', min: -60, max: 0, step: 1, value: -12 },
-      { name: 'ratio', label: 'Ratio', min: 1, max: 20, step: 0.1, value: 3 },
+      { name: 'thresholdDb', label: 'Threshold dB', min: -60, max: 0, step: 1, value: -18 },
+      { name: 'ratio', label: 'Ratio', min: 1, max: 20, step: 0.1, value: 4 },
       { name: 'attackMs', label: 'Attack ms', min: 0, max: 100, step: 1, value: 8 },
       { name: 'releaseMs', label: 'Release ms', min: 20, max: 1000, step: 10, value: 220 },
-      { name: 'makeupDb', label: 'Post gain dB', min: -12, max: 24, step: 0.5, value: 2 },
+      { name: 'makeupDb', label: 'Post gain dB', min: -12, max: 24, step: 0.5, value: 0 },
     ],
     apply: values => applyCompressor(values),
     preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => compressData(data, start, end, values))),
@@ -1500,7 +1542,7 @@ function limiter() {
     copy: 'Set a ceiling for peaks. Drive adds level before the limiter catches the loudest parts.',
     fields: [
       { name: 'ceilingDb', label: 'Ceiling dB', min: -24, max: -0.1, step: 0.1, value: -1 },
-      { name: 'driveDb', label: 'Drive dB', min: 0, max: 12, step: 0.5, value: 0 },
+      { name: 'driveDb', label: 'Drive dB', min: 0, max: 12, step: 0.5, value: 3 },
       { name: 'softness', label: 'Softness', min: 0, max: 1, step: 0.05, value: 0.35 },
     ],
     apply: values => processSamples('Limiter applied', (data, start, end) => limitData(data, start, end, values)),
@@ -1533,8 +1575,8 @@ function noiseGate() {
     title: 'Noise gate',
     copy: 'Reduce low-level room noise between words. Use a lower threshold if it cuts off speech.',
     fields: [
-      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -42 },
-      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -60 },
+      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -35 },
+      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -80 },
       { name: 'attackMs', label: 'Attack ms', min: 0, max: 100, step: 1, value: 5 },
       { name: 'releaseMs', label: 'Release ms', min: 20, max: 1000, step: 10, value: 160 },
     ],
@@ -2208,6 +2250,16 @@ function handleEditorShortcut(event) {
     event.preventDefault();
     if (recorder && recorder.state === 'recording') stopRecording();
     else if (buffer) playPause();
+    return;
+  }
+  if (event.key === 'ArrowLeft' && buffer) {
+    event.preventDefault();
+    nudgePlayhead(-1, event);
+    return;
+  }
+  if (event.key === 'ArrowRight' && buffer) {
+    event.preventDefault();
+    nudgePlayhead(1, event);
     return;
   }
 
