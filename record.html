@@ -18,7 +18,7 @@
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body class="editor-body">
-  <div class="editor-app wave-normal" id="main-content">
+  <div class="editor-app" id="main-content">
     <header class="editor-menubar" role="banner">
       <a href="/" class="editor-logo" aria-label="Vox5000 home"><img src="logo.png" alt="VOX5000" /></a>
       <nav class="editor-menus" aria-label="Editor menus">
@@ -31,8 +31,9 @@
             <button data-editor-action="openRecent">Open recent project</button>
             <button data-editor-action="newMono">New mono file</button>
             <button data-editor-action="newStereo">New stereo file</button>
-            <button data-editor-action="export">Save audio file</button>
+            <button data-editor-action="export">Export audio file</button>
             <button data-editor-action="new">New session</button>
+            <span class="menu-note">Open .vox5000 files here, not by double-clicking them.</span>
           </div>
         </div>
         <div class="menu">
@@ -69,15 +70,24 @@
           <button class="menu-btn" aria-expanded="false" type="button">Filter</button>
           <div class="menu-popover">
             <button data-editor-action="amplify">Amplify volume...</button>
-            <button data-editor-action="normalize">Normalize</button>
-            <button data-editor-action="fadeIn">Fade in</button>
-            <button data-editor-action="fadeOut">Fade out</button>
-            <button data-editor-action="compress">Compressor</button>
-            <button data-editor-action="limit">Hard limiter</button>
-            <button data-editor-action="noise">Noise gate</button>
+            <button data-editor-action="normalize">Normalize...</button>
+            <button data-editor-action="amplify">Amplify / Volume...</button>
+            <button data-editor-action="fadeIn">Fade In</button>
+            <button data-editor-action="fadeOut">Fade Out</button>
+            <button data-editor-action="compress">Dynamics Compressor...</button>
+            <button data-editor-action="noise">Noise Gate...</button>
             <button data-editor-action="removeSilence">Remove silence</button>
+            <button data-editor-action="dcOffset">DC Offset...</button>
+            <button data-editor-action="invert">Invert Signal Polarity</button>
+            <button data-editor-action="swapChannels">Swap Left / Right Channels</button>
             <button data-editor-action="reverse">Reverse audio</button>
+            <button data-editor-action="delayEcho">Delay / Echo...</button>
+            <button data-editor-action="reverb">Reverb...</button>
+            <button data-editor-action="pitchTempo">Pitch / Tempo...</button>
             <button data-editor-action="showEq">3-Band EQ...</button>
+            <button data-editor-action="showEq">10-Band EQ...</button>
+            <button data-editor-action="highPass">High Pass Filter...</button>
+            <button data-editor-action="lowPass">Low Pass Filter...</button>
           </div>
         </div>
         <div class="menu">
@@ -88,9 +98,6 @@
             <button data-editor-action="zoomIn">Zoom in</button>
             <button data-editor-action="zoomOut">Zoom out</button>
             <button data-editor-action="zoomReset">Reset zoom</button>
-            <button data-editor-action="waveCompact">Compact waveform</button>
-            <button data-editor-action="waveNormal">Normal waveform</button>
-            <button data-editor-action="waveLarge">Large waveform</button>
             <button data-editor-action="showSettings">Recorder settings</button>
           </div>
         </div>
@@ -157,7 +164,7 @@
           <canvas id="overviewCanvas" class="overview-waveform" height="86"></canvas>
         </div>
         <div class="wave-stage">
-          <canvas id="waveCanvas" class="editor-waveform" height="420"></canvas>
+          <canvas id="waveCanvas" class="editor-waveform" height="420" tabindex="0"></canvas>
           <div class="timeline-hint" id="timelineHint">
             <div class="empty-actions">
               <button type="button" data-editor-action="newMono">Record new mono</button>
@@ -177,15 +184,6 @@
           <div class="meter-lane" id="meterBarL"><span></span></div>
           <div class="meter-lane" id="meterBarR"><span></span></div>
         </div>
-      </div>
-
-      <div class="footer-module effects-module">
-        <button class="compact-btn" id="normalizeBtn" disabled>Normalize</button>
-        <button class="compact-btn" id="compressBtn" disabled>Compressor</button>
-        <button class="compact-btn" id="limitBtn" disabled>Limiter</button>
-        <button class="compact-btn" id="noiseBtn" disabled>Gate</button>
-        <button class="compact-btn" id="silenceBtn" disabled>Silence</button>
-        <button class="compact-btn" id="eqOpenBtn" disabled>EQ</button>
       </div>
 
       <div class="footer-module export-module">
@@ -299,9 +297,8 @@
           </fieldset>
           <fieldset>
             <legend>Document defaults</legend>
-            <label><span>MP3 bit rate</span><select id="settingBitrate" class="compact-select"><option>128</option><option>192</option><option selected>256</option><option>320</option></select></label>
+            <label><span>MP3 bit rate</span><select id="settingBitrate" class="compact-select"><option selected>128</option><option>192</option><option>256</option><option>320</option></select></label>
             <label><span>Sample rate</span><select id="settingSampleRate" class="compact-select"><option value="44100">44,100 Hz</option><option value="48000" selected>48,000 Hz</option></select></label>
-            <label><span>Zoom</span><select id="settingZoom" class="compact-select"><option value="fit" selected>Fit in window</option><option value="normal">Normal</option><option value="large">Large waveform</option></select></label>
           </fieldset>
           <fieldset>
             <legend>Audio</legend>

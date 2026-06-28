@@ -35,7 +35,6 @@ const els = {
   fadeOut: $('fadeOutBtn'),
   normalize: $('normalizeBtn'),
   compress: $('compressBtn'),
-  limit: $('limitBtn'),
   noise: $('noiseBtn'),
   silence: $('silenceBtn'),
   lowEq: $('lowEq'),
@@ -107,9 +106,13 @@ let playOffset = 0;
 let playEndAt = 0;
 let playSelectionActive = false;
 let previewNode;
+let activeEffectPreview = null;
 let rafId;
 let scrubNode;
 let scrubTimeout = 0;
+let arrowScrubTimer = 0;
+let arrowScrubDirection = 0;
+let arrowScrubStartedAt = 0;
 let buffer = null;
 let fileName = 'Vox5000';
 let selection = null;
@@ -134,8 +137,7 @@ let recordingWaveRafId = 0;
 const canvasCtx = els.canvas ? els.canvas.getContext('2d') : null;
 const overviewCtx = els.overview ? els.overview.getContext('2d') : null;
 const SHORTCUT_STORAGE_KEY = 'vox5000_editor_shortcuts_v1';
-const WAVE_SIZE_STORAGE_KEY = 'vox5000_editor_wave_size_v1';
-const SETTINGS_STORAGE_KEY = 'vox5000_editor_settings_v1';
+const SETTINGS_STORAGE_KEY = 'vox5000_editor_settings_v2';
 const RECENT_PROJECTS_KEY = 'vox5000_recent_projects_v1';
 const MARKER_HIT_SECONDS = 0.08;
 const defaultSettings = {
@@ -179,6 +181,12 @@ function ensureAudioContext() {
 
 function setStatus(text) {
   if (els.status) els.status.textContent = text;
+}
+
+function focusEditor() {
+  requestAnimationFrame(() => {
+    if (els.canvas) els.canvas.focus({ preventScroll: true });
+  });
 }
 
 function fmtTime(seconds) {
@@ -498,22 +506,6 @@ function panViewport(deltaSeconds) {
   drawOverview();
 }
 
-function setWaveSize(size) {
-  if (!els.app) return;
-  els.app.classList.remove('wave-compact', 'wave-normal', 'wave-large');
-  els.app.classList.add(`wave-${size}`);
-  localStorage.setItem(WAVE_SIZE_STORAGE_KEY, size);
-  requestAnimationFrame(() => {
-    drawWaveform();
-    drawOverview();
-  });
-}
-
-function restoreWaveSize() {
-  const stored = localStorage.getItem(WAVE_SIZE_STORAGE_KEY);
-  if (['compact', 'normal', 'large'].includes(stored)) setWaveSize(stored);
-}
-
 function updateChannelScale() {
   if (!els.channelScale) return;
   const stereo = buffer ? buffer.numberOfChannels > 1 : desiredChannels > 1;
@@ -555,7 +547,7 @@ function updateControls() {
   const hasSelection = Boolean(selection && selection.end > selection.start);
   const isRecording = Boolean(recorder && recorder.state === 'recording');
   const isPlaying = Boolean(sourceNode);
-  [els.play, els.rewind, els.end, els.insertSilenceBtn, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.limit, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
+  [els.play, els.rewind, els.end, els.insertSilenceBtn, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
     if (btn) btn.disabled = !hasAudio;
   });
   if (els.stop) els.stop.disabled = !(isRecording || isPlaying);
@@ -803,6 +795,8 @@ async function importFile(file) {
   const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
   if (buffer) pushUndo();
   setBuffer(decoded, file.name.replace(/\.[^.]+$/, '') || 'Vox5000_import');
+  if (els.file) els.file.value = '';
+  focusEditor();
   setStatus('Imported audio');
 }
 
@@ -878,6 +872,8 @@ async function openProjectFile(file) {
   try {
     const payload = JSON.parse(await file.text());
     await loadProjectPayload(payload);
+    if (els.project) els.project.value = '';
+    focusEditor();
     setStatus('Project opened');
   } catch (err) {
     setStatus('Could not open project file');
@@ -1063,6 +1059,35 @@ function nudgePlayhead(direction, event) {
   playScrubPreview();
 }
 
+function startArrowScrub(direction, event) {
+  if (!buffer) return;
+  if (arrowScrubTimer && arrowScrubDirection === direction) return;
+  stopArrowScrub();
+  arrowScrubDirection = direction;
+  arrowScrubStartedAt = Date.now();
+  nudgePlayhead(direction, event);
+  arrowScrubTimer = window.setInterval(() => {
+    const held = Math.min(3, (Date.now() - arrowScrubStartedAt) / 900);
+    const base = event.shiftKey ? 0.08 : event.altKey ? 0.006 : 0.025;
+    if (sourceNode) stopPlayback();
+    playOffset = Math.max(0, Math.min(buffer.duration, playOffset + direction * base * (1 + held)));
+    if (els.time) els.time.textContent = fmtTime(playOffset);
+    if (settings.playbackScroll === 'continuous' && (playOffset < visibleStart || playOffset > visibleStart + visibleDuration())) {
+      visibleStart = Math.max(0, playOffset - visibleDuration() / 2);
+      clampVisibleStart();
+    }
+    drawWaveform();
+    drawOverview();
+    playScrubPreview();
+  }, 33);
+}
+
+function stopArrowScrub() {
+  if (arrowScrubTimer) clearInterval(arrowScrubTimer);
+  arrowScrubTimer = 0;
+  arrowScrubDirection = 0;
+}
+
 function animatePlayhead() {
   drawWaveform();
   if (els.time) els.time.textContent = fmtTime(currentPlayhead());
@@ -1244,9 +1269,9 @@ function clampSample(value) {
 function openEffectDialog(config) {
   if (!els.effectModal || !els.effectFields || !els.effectApply) return;
   stopEffectPreview();
-  let previewing = false;
+  activeEffectPreview = { previewing: false, values: null, config };
   const refreshPreview = () => {
-    if (!previewing || !config.preview) return;
+    if (!activeEffectPreview || !activeEffectPreview.previewing || !config.preview) return;
     clearTimeout(effectPreviewRefreshTimer);
     effectPreviewRefreshTimer = setTimeout(() => config.preview(values), 90);
   };
@@ -1299,20 +1324,22 @@ function openEffectDialog(config) {
   };
   if (els.effectPreview) {
     els.effectPreview.onclick = () => {
-      previewing = true;
+      activeEffectPreview.previewing = true;
+      activeEffectPreview.values = values;
       if (config.preview) config.preview(values);
       else setStatus('Preview is not available for this effect');
     };
   }
   if (els.effectPreviewStop) els.effectPreviewStop.onclick = () => {
-    previewing = false;
     stopEffectPreview();
   };
+  activeEffectPreview.values = values;
   els.effectModal.hidden = false;
 }
 
 function closeEffectDialog() {
   stopEffectPreview();
+  activeEffectPreview = null;
   if (els.effectModal) els.effectModal.hidden = true;
   if (els.effectApply) els.effectApply.onclick = null;
   if (els.effectPreview) els.effectPreview.onclick = null;
@@ -1321,9 +1348,12 @@ function closeEffectDialog() {
 
 function stopEffectPreview() {
   clearTimeout(effectPreviewRefreshTimer);
-  if (!previewNode) return;
-  try { previewNode.stop(); } catch {}
-  try { previewNode.disconnect(); } catch {}
+  if (activeEffectPreview) activeEffectPreview.previewing = false;
+  if (previewNode) {
+    try { previewNode.onended = null; } catch {}
+    try { previewNode.stop(0); } catch {}
+    try { previewNode.disconnect(); } catch {}
+  }
   previewNode = null;
 }
 
@@ -1380,6 +1410,139 @@ function reverseAudio() {
       right -= 1;
     }
   });
+}
+
+function invertSignalPolarity() {
+  if (!buffer) return;
+  processSamples('Signal polarity inverted', (data, start, end) => {
+    for (let i = start; i < end; i++) data[i] = -data[i];
+  });
+}
+
+function swapChannels() {
+  if (!buffer || buffer.numberOfChannels < 2) {
+    setStatus('Swap channels needs stereo audio');
+    return;
+  }
+  pushUndo();
+  const left = new Float32Array(buffer.getChannelData(0));
+  buffer.copyToChannel(buffer.getChannelData(1), 0);
+  buffer.copyToChannel(left, 1);
+  drawWaveform();
+  drawOverview();
+  setStatus('Left and right channels swapped');
+}
+
+function dcOffset() {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'DC Offset',
+    copy: 'Move the waveform centre slightly up or down. Most voice edits should leave this at 0.',
+    fields: [{ name: 'offset', label: 'Offset', min: -0.5, max: 0.5, step: 0.01, value: 0 }],
+    apply: values => processSamples('DC offset applied', (data, start, end) => {
+      for (let i = start; i < end; i++) data[i] = clampSample(data[i] + values.offset);
+    }),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => {
+      for (let i = start; i < end; i++) data[i] = clampSample(data[i] + values.offset);
+    })),
+  });
+}
+
+function delayEcho() {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Delay / Echo',
+    copy: 'Add a short repeat behind the selected audio or the whole file.',
+    fields: [
+      { name: 'delayMs', label: 'Delay ms', min: 40, max: 900, step: 10, value: 180 },
+      { name: 'feedback', label: 'Feedback %', min: 0, max: 80, step: 1, value: 25 },
+      { name: 'mix', label: 'Wet mix %', min: 0, max: 80, step: 1, value: 20 },
+    ],
+    apply: values => processSamples('Delay / echo applied', (data, start, end, sampleRate) => delayData(data, start, end, sampleRate, values)),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => delayData(data, start, end, sampleRate, values))),
+  });
+}
+
+function delayData(data, start, end, sampleRate, values) {
+  const delay = Math.max(1, Math.round(sampleRate * values.delayMs / 1000));
+  const feedback = values.feedback / 100;
+  const mix = values.mix / 100;
+  for (let i = start + delay; i < end; i++) {
+    const echo = data[i - delay] * feedback;
+    data[i] = clampSample(data[i] * (1 - mix) + echo * mix);
+  }
+}
+
+function reverb() {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Reverb',
+    copy: 'Add a simple room tail. Keep it subtle for spoken voice.',
+    fields: [
+      { name: 'room', label: 'Room size %', min: 5, max: 95, step: 1, value: 28 },
+      { name: 'mix', label: 'Wet mix %', min: 0, max: 70, step: 1, value: 12 },
+    ],
+    apply: values => processSamples('Reverb applied', (data, start, end, sampleRate) => reverbData(data, start, end, sampleRate, values)),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => reverbData(data, start, end, sampleRate, values))),
+  });
+}
+
+function reverbData(data, start, end, sampleRate, values) {
+  const mix = values.mix / 100;
+  const room = values.room / 100;
+  const taps = [0.029, 0.037, 0.041, 0.053].map(t => Math.round(t * sampleRate * (0.5 + room)));
+  for (let i = start; i < end; i++) {
+    let wet = 0;
+    taps.forEach((tap, index) => {
+      if (i - tap >= start) wet += data[i - tap] * (0.32 / (index + 1));
+    });
+    data[i] = clampSample(data[i] * (1 - mix) + wet * mix);
+  }
+}
+
+function pitchTempo() {
+  setStatus('Pitch / tempo dialog is planned for the next audio-engine pass');
+}
+
+function highPass() {
+  filterDialog('High Pass Filter', 'Reduce low rumble below the cutoff frequency.', true);
+}
+
+function lowPass() {
+  filterDialog('Low Pass Filter', 'Reduce harsh high frequencies above the cutoff frequency.', false);
+}
+
+function filterDialog(title, copy, high) {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title,
+    copy,
+    fields: [{ name: 'frequency', label: 'Cutoff Hz', min: 40, max: 12000, step: 10, value: high ? 90 : 9000 }],
+    apply: values => processSamples(`${title} applied`, (data, start, end, sampleRate) => onePoleFilter(data, start, end, sampleRate, values.frequency, high)),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => onePoleFilter(data, start, end, sampleRate, values.frequency, high))),
+  });
+}
+
+function onePoleFilter(data, start, end, sampleRate, frequency, high) {
+  const rc = 1 / (2 * Math.PI * Math.max(20, frequency));
+  const dt = 1 / sampleRate;
+  const alpha = high ? rc / (rc + dt) : dt / (rc + dt);
+  let y = data[start] || 0;
+  let lastX = y;
+  for (let i = start; i < end; i++) {
+    const x = data[i];
+    if (high) {
+      y = alpha * (y + x - lastX);
+      lastX = x;
+    } else {
+      y = y + alpha * (x - y);
+    }
+    data[i] = y;
+  }
 }
 
 function mixDownToMono() {
@@ -1532,40 +1695,6 @@ function compressData(data, start, end, values) {
 
 function applyCompressor(values) {
   processSamples('Compressor applied', (data, start, end) => compressData(data, start, end, values));
-}
-
-function limiter() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'Hard limiter',
-    copy: 'Set a ceiling for peaks. Drive adds level before the limiter catches the loudest parts.',
-    fields: [
-      { name: 'ceilingDb', label: 'Ceiling dB', min: -24, max: -0.1, step: 0.1, value: -1 },
-      { name: 'driveDb', label: 'Drive dB', min: 0, max: 12, step: 0.5, value: 3 },
-      { name: 'softness', label: 'Softness', min: 0, max: 1, step: 0.05, value: 0.35 },
-    ],
-    apply: values => processSamples('Limiter applied', (data, start, end) => limitData(data, start, end, values)),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => limitData(data, start, end, values))),
-  });
-}
-
-function limitData(data, start, end, values) {
-  const ceiling = dbToGain(values.ceilingDb);
-  const drive = dbToGain(values.driveDb);
-  const softness = Math.max(0, Math.min(1, Number(values.softness || 0)));
-  for (let i = start; i < end; i++) {
-    const driven = data[i] * drive;
-    const sign = Math.sign(driven);
-    const abs = Math.abs(driven);
-    if (abs <= ceiling) {
-      data[i] = driven;
-    } else {
-      const over = abs - ceiling;
-      const softened = ceiling + (over / (1 + over * (12 + softness * 36)));
-      data[i] = clampSample(sign * Math.min(0.999, softened));
-    }
-  }
 }
 
 function noiseGate() {
@@ -2131,11 +2260,12 @@ async function exportFile() {
   const bitDepth = format === 'wav24' ? 24 : 16;
   const blob = isWav ? encodeWav(buffer, bitDepth) : await encodeMp3(buffer, bitrate);
   const ext = isWav ? 'wav' : 'mp3';
+  const suffix = isWav ? `${bitDepth}bit` : `${bitrate}kbps`;
   const url = URL.createObjectURL(blob);
   els.download.innerHTML = '';
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${fileName || 'Vox5000'}.${ext}`;
+  a.download = `${fileName || 'Vox5000'}_${suffix}.${ext}`;
   a.className = 'dl-btn';
   a.textContent = `Download ${isWav ? `WAV ${bitDepth}-bit` : `MP3 ${bitrate} kbps`} · ${(blob.size / 1048576).toFixed(1)} MB`;
   els.download.appendChild(a);
@@ -2254,12 +2384,12 @@ function handleEditorShortcut(event) {
   }
   if (event.key === 'ArrowLeft' && buffer) {
     event.preventDefault();
-    nudgePlayhead(-1, event);
+    startArrowScrub(-1, event);
     return;
   }
   if (event.key === 'ArrowRight' && buffer) {
     event.preventDefault();
-    nudgePlayhead(1, event);
+    startArrowScrub(1, event);
     return;
   }
 
@@ -2335,7 +2465,6 @@ function bindEvents() {
   if (els.fadeOut) els.fadeOut.addEventListener('click', fadeOut);
   if (els.normalize) els.normalize.addEventListener('click', normalize);
   if (els.compress) els.compress.addEventListener('click', compressVoice);
-  if (els.limit) els.limit.addEventListener('click', limiter);
   if (els.noise) els.noise.addEventListener('click', noiseGate);
   if (els.silence) els.silence.addEventListener('click', removeSilence);
   if (els.eq) els.eq.addEventListener('click', applyEq);
@@ -2343,7 +2472,16 @@ function bindEvents() {
   if (els.eqClose) els.eqClose.addEventListener('click', closeEq);
   if (els.effectClose) els.effectClose.addEventListener('click', closeEffectDialog);
   if (els.effectCancel) els.effectCancel.addEventListener('click', closeEffectDialog);
+  if (els.effectModal) els.effectModal.addEventListener('click', event => {
+    if (event.target === els.effectModal) closeEffectDialog();
+  });
+  if (els.eqModal) els.eqModal.addEventListener('click', event => {
+    if (event.target === els.eqModal) closeEq();
+  });
   if (els.settingsClose) els.settingsClose.addEventListener('click', closeSettings);
+  if (els.settingsModal) els.settingsModal.addEventListener('click', event => {
+    if (event.target === els.settingsModal) closeSettings();
+  });
   if (els.settingsSave) els.settingsSave.addEventListener('click', saveSettingsFromModal);
   if (els.settingsReset) els.settingsReset.addEventListener('click', () => {
     settings = { ...defaultSettings };
@@ -2354,6 +2492,9 @@ function bindEvents() {
     setStatus('Recorder settings reset');
   });
   if (els.recentClose) els.recentClose.addEventListener('click', closeRecentProjects);
+  if (els.recentModal) els.recentModal.addEventListener('click', event => {
+    if (event.target === els.recentModal) closeRecentProjects();
+  });
   if (els.eqReset) els.eqReset.addEventListener('click', () => setEqValues(0, 0, 0));
   if (els.eqPreset) els.eqPreset.addEventListener('change', applyEqPreset);
   [els.lowEq, els.midEq, els.highEq].forEach(slider => {
@@ -2368,6 +2509,9 @@ function bindEvents() {
   if (els.redo) els.redo.addEventListener('click', redo);
   if (els.export) els.export.addEventListener('click', exportFile);
   if (els.shortcutClose) els.shortcutClose.addEventListener('click', closeShortcuts);
+  if (els.shortcutModal) els.shortcutModal.addEventListener('click', event => {
+    if (event.target === els.shortcutModal) closeShortcuts();
+  });
   if (els.shortcutReset) els.shortcutReset.addEventListener('click', () => {
     shortcuts = { ...defaultShortcuts };
     saveShortcuts();
@@ -2516,8 +2660,15 @@ function bindEvents() {
       fadeOut,
       reverse: reverseAudio,
       compress: compressVoice,
-      limit: limiter,
       noise: noiseGate,
+      dcOffset,
+      invert: invertSignalPolarity,
+      swapChannels,
+      delayEcho,
+      reverb,
+      pitchTempo,
+      highPass,
+      lowPass,
       silence: removeSilence,
       removeSilence,
       insertSilence,
@@ -2530,9 +2681,6 @@ function bindEvents() {
       zoomIn: () => setZoom(zoom * 1.4),
       zoomOut: () => setZoom(zoom / 1.4),
       zoomReset: () => setZoom(1),
-      waveCompact: () => setWaveSize('compact'),
-      waveNormal: () => setWaveSize('normal'),
-      waveLarge: () => setWaveSize('large'),
       showShortcuts,
       showSettings,
     };
@@ -2557,6 +2705,9 @@ function bindEvents() {
     drawOverview();
   });
   document.addEventListener('keydown', handleEditorShortcut);
+  document.addEventListener('keyup', event => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') stopArrowScrub();
+  });
   document.addEventListener('paste', pasteExternalAudio);
 }
 
@@ -2564,7 +2715,6 @@ bindEvents();
 applySettingsToUi();
 initMics();
 normalizeShortcutDefaults();
-restoreWaveSize();
 renderShortcuts();
 updateEqValues();
 updateControls();
