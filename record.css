@@ -276,8 +276,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: stretch;
-  gap: 6px;
-  padding: calc(var(--overview-h) + 6px) 3px 6px;
+  gap: 0;
+  padding: var(--overview-h) 3px 0;
   background: #080808;
   border-right: 1px solid #252525;
   box-shadow: inset -1px 0 0 rgba(223, 255, 0, 0.16);
@@ -327,28 +327,6 @@
   width: 100%;
   height: 1px;
   background: rgba(223, 255, 0, 0.16);
-}
-
-.zoom-buttons {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-}
-
-.zoom-buttons button {
-  min-height: 20px;
-  border: 1px solid #333;
-  border-radius: 3px;
-  background: #151515;
-  color: var(--yellow);
-  font: 800 10px/1 var(--mono);
-  cursor: pointer;
-}
-
-.zoom-buttons button:hover {
-  border-color: var(--yellow);
-  background: var(--yellow);
-  color: #000;
 }
 
 .wave-area {

@@ -7,6 +7,7 @@
   <meta name="description" content="Record, import, edit, process and export voice audio in your browser. No account. No install. No cloud audio storage." />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="icon" sizes="512x512" href="favicon-512.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -148,12 +149,6 @@
           <span class="scale-label channel">1</span>
           <span class="scale-label">6</span>
         </div>
-        <span class="scale-label small">1x</span>
-        <div class="zoom-buttons" aria-label="Zoom controls">
-          <button data-editor-action="zoomIn" title="Zoom in">+</button>
-          <button data-editor-action="zoomOut" title="Zoom out">−</button>
-          <button data-editor-action="zoomReset" title="Reset zoom">1x</button>
-        </div>
       </aside>
 
       <div class="wave-area">
@@ -287,7 +282,6 @@
             <legend>General</legend>
             <label><span>During playback</span><select id="settingPlaybackScroll" class="compact-select"><option value="continuous">Scroll continuously</option><option value="static">Keep playhead visible</option></select></label>
             <label><input id="settingWheelZoom" type="checkbox" checked /> <span>Scroll wheel controls waveform zoom</span></label>
-            <label><input id="settingSnapMarkers" type="checkbox" checked /> <span>Snap cursor to nearby markers</span></label>
           </fieldset>
           <fieldset>
             <legend>Colors</legend>

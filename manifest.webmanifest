@@ -1,0 +1,31 @@
+{
+  "name": "VOX5000 Recorder",
+  "short_name": "VOX5000",
+  "description": "Browser-based VOX5000 audio recorder and editor.",
+  "start_url": "/record",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#dfff00",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/record",
+      "accept": {
+        "application/vnd.vox5000.project+json": [".vox5000"],
+        "application/json": [".vox5000"]
+      }
+    }
+  ]
+}

@@ -77,7 +77,6 @@ const els = {
   settingsReset: $('settingsResetBtn'),
   settingPlaybackScroll: $('settingPlaybackScroll'),
   settingWheelZoom: $('settingWheelZoom'),
-  settingSnapMarkers: $('settingSnapMarkers'),
   settingWaveColor: $('settingWaveColor'),
   settingViewColor: $('settingViewColor'),
   settingBgColor: $('settingBgColor'),
@@ -136,11 +135,10 @@ const SHORTCUT_STORAGE_KEY = 'vox5000_editor_shortcuts_v1';
 const WAVE_SIZE_STORAGE_KEY = 'vox5000_editor_wave_size_v1';
 const SETTINGS_STORAGE_KEY = 'vox5000_editor_settings_v1';
 const RECENT_PROJECTS_KEY = 'vox5000_recent_projects_v1';
-const SNAP_SECONDS = 0.08;
+const MARKER_HIT_SECONDS = 0.08;
 const defaultSettings = {
   playbackScroll: 'continuous',
   wheelZoom: true,
-  snapMarkers: true,
   waveColor: '#dfff00',
   viewColor: '#c76bff',
   bgColor: '#030303',
@@ -225,7 +223,6 @@ function saveSettings() {
 function applySettingsToUi() {
   if (els.settingPlaybackScroll) els.settingPlaybackScroll.value = settings.playbackScroll;
   if (els.settingWheelZoom) els.settingWheelZoom.checked = Boolean(settings.wheelZoom);
-  if (els.settingSnapMarkers) els.settingSnapMarkers.checked = Boolean(settings.snapMarkers);
   if (els.settingWaveColor) els.settingWaveColor.value = settings.waveColor;
   if (els.settingViewColor) els.settingViewColor.value = settings.viewColor;
   if (els.settingBgColor) els.settingBgColor.value = settings.bgColor;
@@ -244,7 +241,6 @@ function readSettingsFromUi() {
   settings = {
     playbackScroll: els.settingPlaybackScroll ? els.settingPlaybackScroll.value : defaultSettings.playbackScroll,
     wheelZoom: els.settingWheelZoom ? els.settingWheelZoom.checked : true,
-    snapMarkers: els.settingSnapMarkers ? els.settingSnapMarkers.checked : true,
     waveColor: els.settingWaveColor ? els.settingWaveColor.value : defaultSettings.waveColor,
     viewColor: els.settingViewColor ? els.settingViewColor.value : defaultSettings.viewColor,
     bgColor: els.settingBgColor ? els.settingBgColor.value : defaultSettings.bgColor,
@@ -503,13 +499,6 @@ function updateChannelScale() {
   els.channelScale.innerHTML = stereo
     ? `${lane('L')}<div class="channel-divider"></div>${lane('R')}`
     : lane('1');
-  els.channelScale.innerHTML += `
-    <span class="scale-label small">1x</span>
-    <div class="zoom-buttons" aria-label="Zoom controls">
-      <button data-editor-action="zoomIn" title="Zoom in">+</button>
-      <button data-editor-action="zoomOut" title="Zoom out">−</button>
-      <button data-editor-action="zoomReset" title="Reset zoom">1x</button>
-    </div>`;
 }
 
 function setBuffer(next, name) {
@@ -829,7 +818,7 @@ async function saveProject() {
   setStatus('Saving project');
   const payload = await buildProjectPayload();
   const json = JSON.stringify(payload);
-  const blob = new Blob([json], { type: 'application/json' });
+  const blob = new Blob([json], { type: 'application/vnd.vox5000.project+json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -916,6 +905,16 @@ function showRecentProjects() {
 
 function closeRecentProjects() {
   if (els.recentModal) els.recentModal.hidden = true;
+}
+
+function bindLaunchFiles() {
+  if (!('launchQueue' in window)) return;
+  window.launchQueue.setConsumer(async launchParams => {
+    if (!launchParams.files || !launchParams.files.length) return;
+    const handle = launchParams.files[0];
+    const file = await handle.getFile();
+    await openProjectFile(file);
+  });
 }
 
 function stopPlayback() {
@@ -1087,21 +1086,44 @@ function pasteClipboard() {
   const insertSeconds = playOffset;
   const clipDuration = clipboardBuffer.duration;
   const keptMarkers = markers.map(marker => marker.time >= insertSeconds ? { ...marker, time: marker.time + clipDuration } : marker);
+  insertBufferAtPlayhead(clipboardBuffer, keptMarkers, 'Pasted audio');
+}
+
+function insertBufferAtPlayhead(incomingBuffer, markerState, label = 'Pasted audio') {
+  if (!buffer || !incomingBuffer) return;
   const ctx = ensureAudioContext();
   const insertAt = secondsToSamples(playOffset);
-  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + clipboardBuffer.length, buffer.sampleRate);
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + incomingBuffer.length, buffer.sampleRate);
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const src = buffer.getChannelData(ch);
-    const clip = clipboardBuffer.getChannelData(Math.min(ch, clipboardBuffer.numberOfChannels - 1));
+    const clip = incomingBuffer.getChannelData(Math.min(ch, incomingBuffer.numberOfChannels - 1));
     const dst = out.getChannelData(ch);
     dst.set(src.slice(0, insertAt), 0);
     dst.set(clip, insertAt);
-    dst.set(src.slice(insertAt), insertAt + clipboardBuffer.length);
+    dst.set(src.slice(insertAt), insertAt + incomingBuffer.length);
   }
   setBuffer(out, fileName);
-  markers = keptMarkers;
-  playOffset = samplesToSeconds(insertAt + clipboardBuffer.length);
-  setStatus('Pasted audio');
+  if (markerState) markers = markerState;
+  playOffset = samplesToSeconds(insertAt + incomingBuffer.length);
+  setStatus(label);
+  drawWaveform();
+  drawOverview();
+}
+
+async function pasteExternalAudio(event) {
+  if (!buffer || isTypingTarget(event.target)) return;
+  const items = event.clipboardData ? Array.from(event.clipboardData.items || []) : [];
+  const fileItem = items.find(item => item.kind === 'file' && item.type.startsWith('audio/'));
+  if (!fileItem) return;
+  event.preventDefault();
+  const file = fileItem.getAsFile();
+  if (!file) return;
+  const ctx = ensureAudioContext();
+  const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
+  pushUndo();
+  const insertSeconds = playOffset;
+  const keptMarkers = markers.map(marker => marker.time >= insertSeconds ? { ...marker, time: marker.time + decoded.duration } : marker);
+  insertBufferAtPlayhead(decoded, keptMarkers, 'Pasted external audio');
 }
 
 function cutOrSplit() {
@@ -1243,7 +1265,10 @@ function previewProcessedBuffer(makeBuffer) {
   previewNode.buffer = previewBuffer;
   previewNode.connect(ctx.destination);
   const range = selection && selection.end > selection.start ? selection : { start: 0, end: previewBuffer.duration };
-  previewNode.start(0, range.start, Math.max(0.01, range.end - range.start));
+  previewNode.loop = true;
+  previewNode.loopStart = range.start;
+  previewNode.loopEnd = Math.max(range.start + 0.01, range.end);
+  previewNode.start(0, range.start);
   previewNode.onended = () => { previewNode = null; };
   setStatus('Previewing effect');
 }
@@ -1641,8 +1666,7 @@ function redo() {
 function canvasPointToSeconds(event) {
   const rect = els.canvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-  const seconds = buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
-  return snapTimeToMarker(seconds);
+  return buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
 }
 
 function rawCanvasPointToSeconds(event) {
@@ -1651,19 +1675,10 @@ function rawCanvasPointToSeconds(event) {
   return buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
 }
 
-function snapTimeToMarker(seconds) {
-  if (!settings.snapMarkers || !markers.length) return seconds;
-  const nearest = markers.reduce((best, marker) => {
-    const distance = Math.abs(marker.time - seconds);
-    return !best || distance < best.distance ? { marker, distance } : best;
-  }, null);
-  return nearest && nearest.distance <= SNAP_SECONDS ? nearest.marker.time : seconds;
-}
-
 function markerAtEvent(event) {
   if (!buffer || !markers.length) return null;
   const seconds = rawCanvasPointToSeconds(event);
-  const snap = Math.max(SNAP_SECONDS, visibleDuration() * 0.008);
+  const snap = Math.max(MARKER_HIT_SECONDS, visibleDuration() * 0.008);
   return markers.find(marker => Math.abs(marker.time - seconds) <= snap) || null;
 }
 
@@ -1680,15 +1695,17 @@ function deleteSelectedMarker() {
 }
 
 function selectBetweenMarkers(point) {
-  if (!buffer || markers.length < 2) return false;
+  if (!buffer || markers.length < 1) return false;
   const sorted = markers.slice().sort((a, b) => a.time - b.time);
-  let left = null;
-  let right = null;
+  let left = { time: 0 };
+  let right = { time: buffer.duration };
   sorted.forEach(marker => {
     if (marker.time < point) left = marker;
     if (!right && marker.time > point) right = marker;
+    if (marker.time > point && right.time === buffer.duration) right = marker;
   });
-  if (!left || !right) return false;
+  if (!right) right = { time: buffer.duration };
+  if (right.time <= left.time) return false;
   selection = { start: left.time, end: right.time };
   selectedMarkerId = null;
   playOffset = selection.start;
@@ -2402,10 +2419,12 @@ function bindEvents() {
     drawOverview();
   });
   document.addEventListener('keydown', handleEditorShortcut);
+  document.addEventListener('paste', pasteExternalAudio);
 }
 
 bindEvents();
 applySettingsToUi();
+bindLaunchFiles();
 initMics();
 normalizeShortcutDefaults();
 restoreWaveSize();
