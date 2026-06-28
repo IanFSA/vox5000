@@ -35,7 +35,6 @@ const els = {
   fadeOut: $('fadeOutBtn'),
   normalize: $('normalizeBtn'),
   compress: $('compressBtn'),
-  noise: $('noiseBtn'),
   silence: $('silenceBtn'),
   lowEq: $('lowEq'),
   midEq: $('midEq'),
@@ -547,7 +546,7 @@ function updateControls() {
   const hasSelection = Boolean(selection && selection.end > selection.start);
   const isRecording = Boolean(recorder && recorder.state === 'recording');
   const isPlaying = Boolean(sourceNode);
-  [els.play, els.rewind, els.end, els.insertSilenceBtn, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
+  [els.play, els.rewind, els.end, els.insertSilenceBtn, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
     if (btn) btn.disabled = !hasAudio;
   });
   if (els.stop) els.stop.disabled = !(isRecording || isPlaying);
@@ -1412,139 +1411,6 @@ function reverseAudio() {
   });
 }
 
-function invertSignalPolarity() {
-  if (!buffer) return;
-  processSamples('Signal polarity inverted', (data, start, end) => {
-    for (let i = start; i < end; i++) data[i] = -data[i];
-  });
-}
-
-function swapChannels() {
-  if (!buffer || buffer.numberOfChannels < 2) {
-    setStatus('Swap channels needs stereo audio');
-    return;
-  }
-  pushUndo();
-  const left = new Float32Array(buffer.getChannelData(0));
-  buffer.copyToChannel(buffer.getChannelData(1), 0);
-  buffer.copyToChannel(left, 1);
-  drawWaveform();
-  drawOverview();
-  setStatus('Left and right channels swapped');
-}
-
-function dcOffset() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'DC Offset',
-    copy: 'Move the waveform centre slightly up or down. Most voice edits should leave this at 0.',
-    fields: [{ name: 'offset', label: 'Offset', min: -0.5, max: 0.5, step: 0.01, value: 0 }],
-    apply: values => processSamples('DC offset applied', (data, start, end) => {
-      for (let i = start; i < end; i++) data[i] = clampSample(data[i] + values.offset);
-    }),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => {
-      for (let i = start; i < end; i++) data[i] = clampSample(data[i] + values.offset);
-    })),
-  });
-}
-
-function delayEcho() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'Delay / Echo',
-    copy: 'Add a short repeat behind the selected audio or the whole file.',
-    fields: [
-      { name: 'delayMs', label: 'Delay ms', min: 40, max: 900, step: 10, value: 180 },
-      { name: 'feedback', label: 'Feedback %', min: 0, max: 80, step: 1, value: 25 },
-      { name: 'mix', label: 'Wet mix %', min: 0, max: 80, step: 1, value: 20 },
-    ],
-    apply: values => processSamples('Delay / echo applied', (data, start, end, sampleRate) => delayData(data, start, end, sampleRate, values)),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => delayData(data, start, end, sampleRate, values))),
-  });
-}
-
-function delayData(data, start, end, sampleRate, values) {
-  const delay = Math.max(1, Math.round(sampleRate * values.delayMs / 1000));
-  const feedback = values.feedback / 100;
-  const mix = values.mix / 100;
-  for (let i = start + delay; i < end; i++) {
-    const echo = data[i - delay] * feedback;
-    data[i] = clampSample(data[i] * (1 - mix) + echo * mix);
-  }
-}
-
-function reverb() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'Reverb',
-    copy: 'Add a simple room tail. Keep it subtle for spoken voice.',
-    fields: [
-      { name: 'room', label: 'Room size %', min: 5, max: 95, step: 1, value: 28 },
-      { name: 'mix', label: 'Wet mix %', min: 0, max: 70, step: 1, value: 12 },
-    ],
-    apply: values => processSamples('Reverb applied', (data, start, end, sampleRate) => reverbData(data, start, end, sampleRate, values)),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => reverbData(data, start, end, sampleRate, values))),
-  });
-}
-
-function reverbData(data, start, end, sampleRate, values) {
-  const mix = values.mix / 100;
-  const room = values.room / 100;
-  const taps = [0.029, 0.037, 0.041, 0.053].map(t => Math.round(t * sampleRate * (0.5 + room)));
-  for (let i = start; i < end; i++) {
-    let wet = 0;
-    taps.forEach((tap, index) => {
-      if (i - tap >= start) wet += data[i - tap] * (0.32 / (index + 1));
-    });
-    data[i] = clampSample(data[i] * (1 - mix) + wet * mix);
-  }
-}
-
-function pitchTempo() {
-  setStatus('Pitch / tempo dialog is planned for the next audio-engine pass');
-}
-
-function highPass() {
-  filterDialog('High Pass Filter', 'Reduce low rumble below the cutoff frequency.', true);
-}
-
-function lowPass() {
-  filterDialog('Low Pass Filter', 'Reduce harsh high frequencies above the cutoff frequency.', false);
-}
-
-function filterDialog(title, copy, high) {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title,
-    copy,
-    fields: [{ name: 'frequency', label: 'Cutoff Hz', min: 40, max: 12000, step: 10, value: high ? 90 : 9000 }],
-    apply: values => processSamples(`${title} applied`, (data, start, end, sampleRate) => onePoleFilter(data, start, end, sampleRate, values.frequency, high)),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => onePoleFilter(data, start, end, sampleRate, values.frequency, high))),
-  });
-}
-
-function onePoleFilter(data, start, end, sampleRate, frequency, high) {
-  const rc = 1 / (2 * Math.PI * Math.max(20, frequency));
-  const dt = 1 / sampleRate;
-  const alpha = high ? rc / (rc + dt) : dt / (rc + dt);
-  let y = data[start] || 0;
-  let lastX = y;
-  for (let i = start; i < end; i++) {
-    const x = data[i];
-    if (high) {
-      y = alpha * (y + x - lastX);
-      lastX = x;
-    } else {
-      y = y + alpha * (x - y);
-    }
-    data[i] = y;
-  }
-}
-
 function mixDownToMono() {
   if (!buffer) return;
   if (buffer.numberOfChannels === 1) {
@@ -1695,107 +1561,6 @@ function compressData(data, start, end, values) {
 
 function applyCompressor(values) {
   processSamples('Compressor applied', (data, start, end) => compressData(data, start, end, values));
-}
-
-function noiseGate() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'Noise gate',
-    copy: 'Reduce low-level room noise between words. Use a lower threshold if it cuts off speech.',
-    fields: [
-      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -35 },
-      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -80 },
-      { name: 'attackMs', label: 'Attack ms', min: 0, max: 100, step: 1, value: 5 },
-      { name: 'releaseMs', label: 'Release ms', min: 20, max: 1000, step: 10, value: 160 },
-    ],
-    apply: values => processSamples('Noise gate applied', (data, start, end) => gateData(data, start, end, values)),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => gateData(data, start, end, values))),
-  });
-}
-
-function gateData(data, start, end, values) {
-  const threshold = dbToGain(values.thresholdDb);
-  const reduction = dbToGain(values.reductionDb);
-  const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
-  const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
-  let gain = 1;
-  for (let i = start; i < end; i++) {
-    const target = Math.abs(data[i]) >= threshold ? 1 : reduction;
-    gain = target > gain
-      ? attack * gain + (1 - attack) * target
-      : release * gain + (1 - release) * target;
-    data[i] *= gain;
-  }
-}
-
-function removeSilence() {
-  if (!buffer) return;
-  openEffectDialog({
-    kicker: 'Filter',
-    title: 'Remove silence',
-    copy: 'Remove quiet sections below the threshold, with a little padding kept around speech.',
-    fields: [
-      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -45 },
-      { name: 'minSilenceMs', label: 'Minimum silence ms', min: 50, max: 2000, step: 10, value: 250 },
-      { name: 'paddingMs', label: 'Padding ms', min: 0, max: 500, step: 10, value: 80 },
-    ],
-    apply: values => applyRemoveSilence(values),
-  });
-}
-
-function applyRemoveSilence(values) {
-  if (!buffer) return;
-  const keptMarkers = markers.slice();
-  const threshold = dbToGain(values.thresholdDb);
-  const frame = 512;
-  const minSilentFrames = Math.max(1, Math.round((values.minSilenceMs / 1000) * buffer.sampleRate / frame));
-  const padding = Math.round((values.paddingMs / 1000) * buffer.sampleRate);
-  const voiced = [];
-  for (let i = 0; i < buffer.length; i += frame) {
-    let peak = 0;
-    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-      const data = buffer.getChannelData(ch);
-      for (let j = i; j < Math.min(i + frame, buffer.length); j++) peak = Math.max(peak, Math.abs(data[j]));
-    }
-    voiced.push(peak >= threshold);
-  }
-  const keep = [];
-  let silentRun = 0;
-  for (let idx = 0; idx < voiced.length; idx++) {
-    if (!voiced[idx]) {
-      silentRun += 1;
-      if (silentRun >= minSilentFrames) continue;
-    } else {
-      silentRun = 0;
-    }
-    const start = Math.max(0, idx * frame - padding);
-    const end = Math.min(buffer.length, (idx + 1) * frame + padding);
-    if (keep.length && start <= keep[keep.length - 1][1]) keep[keep.length - 1][1] = Math.max(keep[keep.length - 1][1], end);
-    else keep.push([start, end]);
-  }
-  if (!keep.length) {
-    setStatus('No audio found above silence threshold');
-    return;
-  }
-  pushUndo();
-  const total = keep.reduce((sum, part) => sum + part[1] - part[0], 0);
-  const ctx = ensureAudioContext();
-  const out = ctx.createBuffer(buffer.numberOfChannels, total, buffer.sampleRate);
-  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-    const src = buffer.getChannelData(ch);
-    const dst = out.getChannelData(ch);
-    let offset = 0;
-    keep.forEach(([start, end]) => {
-      dst.set(src.slice(start, end), offset);
-      offset += end - start;
-    });
-  }
-  setBuffer(out, fileName);
-  markers = keptMarkers.filter(marker => marker.time <= out.duration);
-  drawWaveform();
-  drawOverview();
-  setStatus('Silence removed');
 }
 
 function insertSilence() {
@@ -2465,8 +2230,6 @@ function bindEvents() {
   if (els.fadeOut) els.fadeOut.addEventListener('click', fadeOut);
   if (els.normalize) els.normalize.addEventListener('click', normalize);
   if (els.compress) els.compress.addEventListener('click', compressVoice);
-  if (els.noise) els.noise.addEventListener('click', noiseGate);
-  if (els.silence) els.silence.addEventListener('click', removeSilence);
   if (els.eq) els.eq.addEventListener('click', applyEq);
   if (els.eqOpen) els.eqOpen.addEventListener('click', showEq);
   if (els.eqClose) els.eqClose.addEventListener('click', closeEq);
@@ -2660,17 +2423,6 @@ function bindEvents() {
       fadeOut,
       reverse: reverseAudio,
       compress: compressVoice,
-      noise: noiseGate,
-      dcOffset,
-      invert: invertSignalPolarity,
-      swapChannels,
-      delayEcho,
-      reverb,
-      pitchTempo,
-      highPass,
-      lowPass,
-      silence: removeSilence,
-      removeSilence,
       insertSilence,
       eq: applyEq,
       showEq,

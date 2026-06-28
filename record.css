@@ -20,7 +20,7 @@
 
 .editor-menubar {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) auto;
+  grid-template-columns: 180px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   height: 34px;
@@ -125,16 +125,6 @@
 .menu-popover a:hover {
   background: var(--yellow);
   color: #000;
-}
-
-.editor-room-link {
-  background: var(--yellow);
-  color: #000;
-  text-decoration: none;
-  font-weight: 800;
-  font-size: 12px;
-  padding: 7px 12px;
-  border-radius: 5px;
 }
 
 .file-input {
@@ -968,10 +958,6 @@
   .editor-menubar {
     grid-template-columns: 112px minmax(0, 1fr);
     gap: 6px;
-  }
-
-  .editor-room-link {
-    display: none;
   }
 
   .editor-menus {

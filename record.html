@@ -25,14 +25,15 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">File</button>
           <div class="menu-popover">
-            <label for="fileInput">Open audio file</label>
-            <label for="projectInput">Open project</label>
-            <button data-editor-action="saveProject">Save project</button>
-            <button data-editor-action="openRecent">Open recent project</button>
             <button data-editor-action="newMono">New mono file</button>
             <button data-editor-action="newStereo">New stereo file</button>
-            <button data-editor-action="export">Export audio file</button>
             <button data-editor-action="new">New session</button>
+            <label for="fileInput">Open audio file</label>
+            <label for="projectInput">Open project</label>
+            <button data-editor-action="openRecent">Open recent project</button>
+            <button data-editor-action="saveProject">Save project</button>
+            <button data-editor-action="export">Export audio file</button>
+            <button data-editor-action="showSettings">Recorder settings</button>
             <span class="menu-note">Open .vox5000 files here, not by double-clicking them.</span>
           </div>
         </div>
@@ -51,8 +52,6 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Audio</button>
           <div class="menu-popover">
-            <button data-editor-action="newMono"><span>New mono file</span></button>
-            <button data-editor-action="newStereo">New stereo file</button>
             <button data-editor-action="mixMono">Mix down to mono</button>
             <button data-editor-action="mixStereo">Mix down to stereo</button>
             <button data-editor-action="start"><span>Return to start</span><kbd>Enter</kbd></button>
@@ -69,25 +68,13 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Filter</button>
           <div class="menu-popover">
-            <button data-editor-action="amplify">Amplify volume...</button>
             <button data-editor-action="normalize">Normalize...</button>
             <button data-editor-action="amplify">Amplify / Volume...</button>
             <button data-editor-action="fadeIn">Fade In</button>
             <button data-editor-action="fadeOut">Fade Out</button>
             <button data-editor-action="compress">Dynamics Compressor...</button>
-            <button data-editor-action="noise">Noise Gate...</button>
-            <button data-editor-action="removeSilence">Remove silence</button>
-            <button data-editor-action="dcOffset">DC Offset...</button>
-            <button data-editor-action="invert">Invert Signal Polarity</button>
-            <button data-editor-action="swapChannels">Swap Left / Right Channels</button>
             <button data-editor-action="reverse">Reverse audio</button>
-            <button data-editor-action="delayEcho">Delay / Echo...</button>
-            <button data-editor-action="reverb">Reverb...</button>
-            <button data-editor-action="pitchTempo">Pitch / Tempo...</button>
             <button data-editor-action="showEq">3-Band EQ...</button>
-            <button data-editor-action="showEq">10-Band EQ...</button>
-            <button data-editor-action="highPass">High Pass Filter...</button>
-            <button data-editor-action="lowPass">Low Pass Filter...</button>
           </div>
         </div>
         <div class="menu">
@@ -98,7 +85,6 @@
             <button data-editor-action="zoomIn">Zoom in</button>
             <button data-editor-action="zoomOut">Zoom out</button>
             <button data-editor-action="zoomReset">Reset zoom</button>
-            <button data-editor-action="showSettings">Recorder settings</button>
           </div>
         </div>
         <div class="menu">
@@ -110,7 +96,6 @@
           </div>
         </div>
       </nav>
-      <a href="/room" class="editor-room-link">Create room</a>
     </header>
 
     <input id="fileInput" class="file-input" type="file" accept="audio/*" />
