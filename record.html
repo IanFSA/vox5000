@@ -35,26 +35,34 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Edit</button>
           <div class="menu-popover">
-            <button data-editor-action="undo">Undo</button>
-            <button data-editor-action="redo">Redo</button>
-            <button data-editor-action="copy">Copy selection</button>
-            <button data-editor-action="paste">Paste</button>
+            <button data-editor-action="undo"><span>Undo</span><kbd>Ctrl Z</kbd></button>
+            <button data-editor-action="redo"><span>Redo</span><kbd>Ctrl Y</kbd></button>
+            <button data-editor-action="copy"><span>Copy selection</span><kbd>Ctrl C</kbd></button>
+            <button data-editor-action="paste"><span>Paste</span><kbd>Ctrl V</kbd></button>
             <button data-editor-action="trim">Trim</button>
-            <button data-editor-action="delete">Delete selection</button>
+            <button data-editor-action="delete"><span>Delete selection</span><kbd>Del</kbd></button>
             <button data-editor-action="split">Split</button>
           </div>
         </div>
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Audio</button>
           <div class="menu-popover">
-            <button data-editor-action="recordMono">Record mono</button>
+            <button data-editor-action="recordMono"><span>Record mono</span><kbd>R</kbd></button>
             <button data-editor-action="recordStereo">Record stereo</button>
-            <button data-editor-action="newMono">New mono file</button>
+            <button data-editor-action="newMono"><span>New mono file</span></button>
             <button data-editor-action="newStereo">New stereo file</button>
+            <button data-editor-action="start"><span>Return to start</span><kbd>Enter</kbd></button>
           </div>
         </div>
         <div class="menu">
-          <button class="menu-btn" aria-expanded="false" type="button">Effects</button>
+          <button class="menu-btn" aria-expanded="false" type="button">Insert</button>
+          <div class="menu-popover">
+            <button data-editor-action="insertSilence">Insert silence</button>
+            <button data-editor-action="marker"><span>Marker</span><kbd>M</kbd></button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu-btn" aria-expanded="false" type="button">Filter</button>
           <div class="menu-popover">
             <button data-editor-action="normalize">Normalize</button>
             <button data-editor-action="fadeIn">Fade in</button>
@@ -62,8 +70,8 @@
             <button data-editor-action="compress">Compressor</button>
             <button data-editor-action="limit">Hard limiter</button>
             <button data-editor-action="noise">Noise gate</button>
-            <button data-editor-action="silence">Remove silence</button>
-            <button data-editor-action="eq">Apply EQ</button>
+            <button data-editor-action="removeSilence">Remove silence</button>
+            <button data-editor-action="showEq">3-Band EQ...</button>
           </div>
         </div>
         <div class="menu">
@@ -127,9 +135,11 @@
 
     <section class="wave-editor" aria-label="Waveform editor">
       <aside class="channel-strip mono" id="channelScale" aria-label="Channel scale">
-        <span class="scale-label">6</span>
-        <span class="scale-label channel">1</span>
-        <span class="scale-label">6</span>
+        <div class="channel-lane mono-lane">
+          <span class="scale-label">6</span>
+          <span class="scale-label channel">1</span>
+          <span class="scale-label">6</span>
+        </div>
         <span class="scale-label small">1x</span>
         <div class="zoom-buttons" aria-label="Zoom controls">
           <button data-editor-action="zoomIn" title="Zoom in">+</button>
@@ -166,18 +176,28 @@
         <button class="compact-btn" id="limitBtn" disabled>Limiter</button>
         <button class="compact-btn" id="noiseBtn" disabled>Gate</button>
         <button class="compact-btn" id="silenceBtn" disabled>Silence</button>
-      </div>
-
-      <div class="footer-module eq-module">
-        <label for="lowEq">Low</label><input id="lowEq" type="range" min="-12" max="12" step="1" value="0" />
-        <label for="midEq">Mid</label><input id="midEq" type="range" min="-12" max="12" step="1" value="0" />
-        <label for="highEq">High</label><input id="highEq" type="range" min="-12" max="12" step="1" value="0" />
-        <button class="compact-btn" id="eqBtn" disabled>Apply EQ</button>
+        <button class="compact-btn" id="eqOpenBtn" disabled>EQ</button>
       </div>
 
       <div class="footer-module export-module">
         <select id="exportFormat" class="compact-select">
-          <option value="mp3">MP3 256 kbps</option>
+          <option value="mp3:8">MP3 8 kbps</option>
+          <option value="mp3:16">MP3 16 kbps</option>
+          <option value="mp3:24">MP3 24 kbps</option>
+          <option value="mp3:32">MP3 32 kbps</option>
+          <option value="mp3:40">MP3 40 kbps</option>
+          <option value="mp3:48">MP3 48 kbps</option>
+          <option value="mp3:56">MP3 56 kbps</option>
+          <option value="mp3:64">MP3 64 kbps</option>
+          <option value="mp3:80">MP3 80 kbps</option>
+          <option value="mp3:96">MP3 96 kbps</option>
+          <option value="mp3:112">MP3 112 kbps</option>
+          <option value="mp3:128">MP3 128 kbps</option>
+          <option value="mp3:160">MP3 160 kbps</option>
+          <option value="mp3:192">MP3 192 kbps</option>
+          <option value="mp3:224">MP3 224 kbps</option>
+          <option value="mp3:256" selected>MP3 256 kbps</option>
+          <option value="mp3:320">MP3 320 kbps</option>
           <option value="wav">WAV 16-bit</option>
         </select>
         <button class="compact-btn export" id="exportBtn" disabled>Export</button>
@@ -192,6 +212,38 @@
       <span id="selectionText">Selection: none</span>
     </div>
 
+    <div class="eq-modal" id="eqModal" hidden role="dialog" aria-modal="true" aria-labelledby="eqTitle">
+      <div class="eq-panel">
+        <div class="eq-head">
+          <div>
+            <p class="panel-kicker">Filter</p>
+            <h2 id="eqTitle">3-Band EQ</h2>
+          </div>
+          <button class="square-btn" id="eqCloseBtn" type="button" aria-label="Close EQ">×</button>
+        </div>
+        <label class="eq-preset">
+          <span>Preset</span>
+          <select id="eqPreset" class="compact-select">
+            <option value="flat">None</option>
+            <option value="voice">Voice presence</option>
+            <option value="warm">Warm voice</option>
+            <option value="bright">Bright voice</option>
+            <option value="thin">Reduce boom</option>
+          </select>
+        </label>
+        <div class="eq-board">
+          <div class="eq-scale"><span>+12 dB</span><span>0 dB</span><span>-12 dB</span></div>
+          <label class="eq-band"><span>Low<br><small>80 Hz</small></span><input id="lowEq" type="range" min="-12" max="12" step="1" value="0" orient="vertical" /><output id="lowEqVal">0 dB</output></label>
+          <label class="eq-band"><span>Mid<br><small>2.5 kHz</small></span><input id="midEq" type="range" min="-12" max="12" step="1" value="0" orient="vertical" /><output id="midEqVal">0 dB</output></label>
+          <label class="eq-band"><span>High<br><small>12 kHz</small></span><input id="highEq" type="range" min="-12" max="12" step="1" value="0" orient="vertical" /><output id="highEqVal">0 dB</output></label>
+        </div>
+        <div class="eq-actions">
+          <button class="compact-btn" id="eqResetBtn" type="button">Reset</button>
+          <button class="compact-btn export" id="eqBtn" type="button" disabled>Apply EQ</button>
+        </div>
+      </div>
+    </div>
+
     <div class="shortcut-modal" id="shortcutModal" hidden role="dialog" aria-modal="true" aria-labelledby="shortcutTitle">
       <div class="shortcut-panel">
         <div class="shortcut-head">
@@ -204,6 +256,7 @@
         <div class="shortcut-list" id="shortcutList">
           <label><span>Play / pause</span><input data-shortcut-input="playPause" readonly /></label>
           <label><span>Record</span><input data-shortcut-input="record" readonly /></label>
+          <label><span>Return to start</span><input data-shortcut-input="returnToStart" readonly /></label>
           <label><span>Delete selection</span><input data-shortcut-input="deleteSelection" readonly /></label>
           <label><span>Undo</span><input data-shortcut-input="undo" readonly /></label>
           <label><span>Redo</span><input data-shortcut-input="redo" readonly /></label>

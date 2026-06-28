@@ -37,6 +37,14 @@ const els = {
   midEq: $('midEq'),
   highEq: $('highEq'),
   eq: $('eqBtn'),
+  eqOpen: $('eqOpenBtn'),
+  eqModal: $('eqModal'),
+  eqClose: $('eqCloseBtn'),
+  eqReset: $('eqResetBtn'),
+  eqPreset: $('eqPreset'),
+  lowEqVal: $('lowEqVal'),
+  midEqVal: $('midEqVal'),
+  highEqVal: $('highEqVal'),
   exportFormat: $('exportFormat'),
   export: $('exportBtn'),
   download: $('downloadSlot'),
@@ -85,6 +93,7 @@ const WAVE_SIZE_STORAGE_KEY = 'vox5000_editor_wave_size_v1';
 const defaultShortcuts = {
   playPause: 'Space',
   record: 'R',
+  returnToStart: 'Enter',
   deleteSelection: 'Delete',
   undo: 'Ctrl+Z',
   redo: 'Ctrl+Y',
@@ -94,6 +103,7 @@ const defaultShortcuts = {
   marker: 'M',
 };
 let shortcuts = loadShortcuts();
+let meterRafId = 0;
 
 function ensureAudioContext() {
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
@@ -137,6 +147,17 @@ function renderShortcuts() {
   els.shortcutList.querySelectorAll('[data-shortcut-input]').forEach(input => {
     input.value = shortcuts[input.dataset.shortcutInput] || '';
   });
+}
+
+function normalizeShortcutDefaults() {
+  let changed = false;
+  Object.entries(defaultShortcuts).forEach(([key, value]) => {
+    if (!shortcuts[key]) {
+      shortcuts[key] = value;
+      changed = true;
+    }
+  });
+  if (changed) saveShortcuts();
 }
 
 function eventToShortcut(event) {
@@ -281,13 +302,19 @@ function restoreWaveSize() {
 function updateChannelScale() {
   if (!els.channelScale) return;
   const stereo = buffer ? buffer.numberOfChannels > 1 : desiredChannels > 1;
-  const labels = stereo ? ['6', 'L', '6', '6', 'R', '6', '1x'] : ['6', '1', '6', '1x'];
   els.channelScale.classList.toggle('stereo', stereo);
   els.channelScale.classList.toggle('mono', !stereo);
-  els.channelScale.innerHTML = labels.map(label => {
-    const className = label === 'L' || label === 'R' || label === '1' ? 'scale-label channel' : label === '1x' ? 'scale-label small' : 'scale-label';
-    return `<span class="${className}">${label}</span>`;
-  }).join('') + `
+  const lane = label => `
+    <div class="channel-lane">
+      <span class="scale-label">6</span>
+      <span class="scale-label channel">${label}</span>
+      <span class="scale-label">6</span>
+    </div>`;
+  els.channelScale.innerHTML = stereo
+    ? `${lane('L')}<div class="channel-divider"></div>${lane('R')}`
+    : lane('1');
+  els.channelScale.innerHTML += `
+    <span class="scale-label small">1x</span>
     <div class="zoom-buttons" aria-label="Zoom controls">
       <button data-editor-action="zoomIn" title="Zoom in">+</button>
       <button data-editor-action="zoomOut" title="Zoom out">−</button>
@@ -313,7 +340,7 @@ function setBuffer(next, name) {
 function updateControls() {
   const hasAudio = Boolean(buffer);
   const hasSelection = Boolean(selection && selection.end > selection.start);
-  [els.play, els.rewind, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.limit, els.noise, els.silence, els.eq, els.export].forEach(btn => {
+  [els.play, els.rewind, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.limit, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
     if (btn) btn.disabled = !hasAudio;
   });
   [els.trim, els.del, els.fadeIn, els.fadeOut].forEach(btn => {
@@ -388,6 +415,7 @@ async function startInput(deviceId) {
 }
 
 function drawInputMeter() {
+  if (meterRafId) cancelAnimationFrame(meterRafId);
   const data = new Uint8Array(inputAnalyser ? inputAnalyser.frequencyBinCount : 512);
   function tick() {
     if (inputAnalyser) {
@@ -396,13 +424,16 @@ function drawInputMeter() {
       for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i] - 128) / 128);
       if (els.meter) els.meter.style.setProperty('--level', `${Math.min(100, Math.round(peak * 200))}%`);
     }
-    requestAnimationFrame(tick);
+    meterRafId = requestAnimationFrame(tick);
   }
   tick();
 }
 
 async function startRecording() {
-  if (recorder && recorder.state === 'recording') return;
+  if (recorder && recorder.state === 'recording') {
+    stopRecording();
+    return;
+  }
   try {
     await startInput(els.mic ? els.mic.value : '');
   } catch {
@@ -473,6 +504,16 @@ function clearSelection() {
   updateControls();
   drawWaveform();
   drawOverview();
+}
+
+function returnToStart() {
+  playOffset = 0;
+  visibleStart = 0;
+  stopPlayback();
+  if (els.time) els.time.textContent = fmtTime(0);
+  drawWaveform();
+  drawOverview();
+  setStatus('Returned to start');
 }
 
 function playPause() {
@@ -696,6 +737,24 @@ function removeSilence() {
   setStatus('Silence removed');
 }
 
+function insertSilence() {
+  if (!buffer) return;
+  pushUndo();
+  const ctx = ensureAudioContext();
+  const insertAt = secondsToSamples(playOffset);
+  const silenceLength = Math.max(1, Math.round(buffer.sampleRate));
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + silenceLength, buffer.sampleRate);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    dst.set(src.slice(0, insertAt), 0);
+    dst.set(src.slice(insertAt), insertAt + silenceLength);
+  }
+  setBuffer(out, fileName);
+  playOffset = samplesToSeconds(insertAt + silenceLength);
+  setStatus('Inserted 1 second of silence');
+}
+
 async function applyEq() {
   if (!buffer) return;
   pushUndo();
@@ -719,6 +778,41 @@ async function applyEq() {
   src.start();
   setBuffer(await ctx.startRendering(), fileName);
   setStatus('EQ applied');
+  closeEq();
+}
+
+function showEq() {
+  updateEqValues();
+  if (els.eqModal) els.eqModal.hidden = false;
+}
+
+function closeEq() {
+  if (els.eqModal) els.eqModal.hidden = true;
+}
+
+function updateEqValues() {
+  const format = value => `${Number(value || 0) > 0 ? '+' : ''}${Number(value || 0)} dB`;
+  if (els.lowEqVal && els.lowEq) els.lowEqVal.textContent = format(els.lowEq.value);
+  if (els.midEqVal && els.midEq) els.midEqVal.textContent = format(els.midEq.value);
+  if (els.highEqVal && els.highEq) els.highEqVal.textContent = format(els.highEq.value);
+}
+
+function setEqValues(low, mid, high) {
+  if (els.lowEq) els.lowEq.value = low;
+  if (els.midEq) els.midEq.value = mid;
+  if (els.highEq) els.highEq.value = high;
+  updateEqValues();
+}
+
+function applyEqPreset() {
+  const presets = {
+    flat: [0, 0, 0],
+    voice: [-2, 3, 2],
+    warm: [3, 1, -1],
+    bright: [-1, 2, 4],
+    thin: [-5, 1, 2],
+  };
+  setEqValues(...(presets[els.eqPreset.value] || presets.flat));
 }
 
 function undo() {
@@ -786,7 +880,7 @@ function drawWaveform() {
     canvasCtx.lineTo(w, mid);
     canvasCtx.stroke();
 
-    canvasCtx.fillStyle = '#bff8ff';
+    canvasCtx.fillStyle = '#dfff00';
     for (let x = 0; x < w; x++) {
       const start = sampleStart + Math.floor(x * step);
       let min = 1;
@@ -869,7 +963,7 @@ function drawOverview() {
   const waveHeight = Math.max(8, h - rulerHeight - 7);
   const mid = top + waveHeight / 2;
   const step = Math.max(1, Math.floor(data.length / Math.max(1, w)));
-  overviewCtx.fillStyle = '#00ff38';
+  overviewCtx.fillStyle = '#dfff00';
   for (let x = 0; x < w; x++) {
     const start = Math.floor(x * step);
     let min = 1;
@@ -954,7 +1048,7 @@ function encodeWav(src) {
   return new Blob([bufferOut], { type: 'audio/wav' });
 }
 
-async function encodeMp3(src) {
+async function encodeMp3(src, bitrate = 256) {
   if (!window.lamejs) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -967,7 +1061,7 @@ async function encodeMp3(src) {
   const channels = src.numberOfChannels > 1 ? 2 : 1;
   const left = src.getChannelData(0);
   const right = channels > 1 ? src.getChannelData(1) : left;
-  const encoder = new lamejs.Mp3Encoder(channels, src.sampleRate, 256);
+  const encoder = new lamejs.Mp3Encoder(channels, src.sampleRate, bitrate);
   const block = 1152;
   const chunks = [];
   const toInt16 = data => {
@@ -996,15 +1090,17 @@ async function exportFile() {
   els.export.disabled = true;
   setStatus('Exporting');
   const format = els.exportFormat.value;
-  const blob = format === 'wav' ? encodeWav(buffer) : await encodeMp3(buffer);
-  const ext = format === 'wav' ? 'wav' : 'mp3';
+  const isWav = format === 'wav';
+  const bitrate = isWav ? 0 : Number((format.split(':')[1] || 256));
+  const blob = isWav ? encodeWav(buffer) : await encodeMp3(buffer, bitrate);
+  const ext = isWav ? 'wav' : 'mp3';
   const url = URL.createObjectURL(blob);
   els.download.innerHTML = '';
   const a = document.createElement('a');
   a.href = url;
   a.download = `${fileName || 'Vox5000'}.${ext}`;
   a.className = 'dl-btn';
-  a.textContent = `Download ${ext.toUpperCase()} · ${(blob.size / 1048576).toFixed(1)} MB`;
+  a.textContent = `Download ${isWav ? 'WAV' : `MP3 ${bitrate} kbps`} · ${(blob.size / 1048576).toFixed(1)} MB`;
   els.download.appendChild(a);
   els.export.disabled = false;
   setStatus('Export ready');
@@ -1092,6 +1188,7 @@ function handleEditorShortcut(event) {
   if (event.key === 'Escape') {
     closeMenus();
     closeShortcuts();
+    closeEq();
     finishWaveDrag(event);
     return;
   }
@@ -1099,6 +1196,7 @@ function handleEditorShortcut(event) {
   const actionByShortcut = [
     ['playPause', playPause],
     ['record', startRecording],
+    ['returnToStart', returnToStart],
     ['deleteSelection', deleteSelection],
     ['undo', undo],
     ['redo', redo],
@@ -1135,6 +1233,13 @@ function bindEvents() {
   if (els.noise) els.noise.addEventListener('click', noiseGate);
   if (els.silence) els.silence.addEventListener('click', removeSilence);
   if (els.eq) els.eq.addEventListener('click', applyEq);
+  if (els.eqOpen) els.eqOpen.addEventListener('click', showEq);
+  if (els.eqClose) els.eqClose.addEventListener('click', closeEq);
+  if (els.eqReset) els.eqReset.addEventListener('click', () => setEqValues(0, 0, 0));
+  if (els.eqPreset) els.eqPreset.addEventListener('change', applyEqPreset);
+  [els.lowEq, els.midEq, els.highEq].forEach(slider => {
+    if (slider) slider.addEventListener('input', updateEqValues);
+  });
   if (els.undo) els.undo.addEventListener('click', undo);
   if (els.redo) els.redo.addEventListener('click', redo);
   if (els.export) els.export.addEventListener('click', exportFile);
@@ -1255,8 +1360,12 @@ function bindEvents() {
       limit: limiter,
       noise: noiseGate,
       silence: removeSilence,
+      removeSilence,
+      insertSilence,
       eq: applyEq,
-      start: () => { playOffset = 0; stopPlayback(); drawWaveform(); },
+      showEq,
+      marker: () => setStatus(`Marker noted at ${fmtTime(currentPlayhead())}`),
+      start: returnToStart,
       clearSelection,
       zoomIn: () => setZoom(zoom * 1.4),
       zoomOut: () => setZoom(zoom / 1.4),
@@ -1290,8 +1399,10 @@ function bindEvents() {
 
 bindEvents();
 initMics();
+normalizeShortcutDefaults();
 restoreWaveSize();
 renderShortcuts();
+updateEqValues();
 updateControls();
 drawWaveform();
 drawOverview();
