@@ -7,7 +7,6 @@
   <meta name="description" content="Record, import, edit, process and export voice audio in your browser. No account. No install. No cloud audio storage." />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="icon" sizes="512x512" href="favicon-512.png" />
-  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -53,6 +52,8 @@
           <div class="menu-popover">
             <button data-editor-action="newMono"><span>New mono file</span></button>
             <button data-editor-action="newStereo">New stereo file</button>
+            <button data-editor-action="mixMono">Mix down to mono</button>
+            <button data-editor-action="mixStereo">Mix down to stereo</button>
             <button data-editor-action="start"><span>Return to start</span><kbd>Enter</kbd></button>
             <button data-editor-action="end"><span>Go to end</span><kbd>Shift Enter</kbd></button>
           </div>
@@ -97,6 +98,7 @@
           <button class="menu-btn" aria-expanded="false" type="button">Help</button>
           <div class="menu-popover">
             <button data-editor-action="showShortcuts">Keyboard shortcuts</button>
+            <a href="vox5000-recorder-guide.pdf" download>Download recorder guide</a>
             <a href="/help">VOX5000 help</a>
           </div>
         </div>
@@ -110,7 +112,6 @@
     <section class="editor-toolbar" aria-label="Transport and editing controls">
       <div class="time-stack">
         <div class="time-display" id="timeDisplay">00:00.000</div>
-        <div class="time-sub" id="durationText">Duration: 00:00.000</div>
       </div>
 
       <div class="transport-group">
@@ -158,7 +159,13 @@
         <div class="wave-stage">
           <canvas id="waveCanvas" class="editor-waveform" height="420"></canvas>
           <div class="timeline-hint" id="timelineHint">
-            Drag and drop an audio file here, or use File > Import audio.
+            <strong>Start a VOX5000 recorder session</strong>
+            <span>Record a new file, open audio, or drag audio/project files here.</span>
+            <div class="empty-actions">
+              <button type="button" data-editor-action="newMono">Record new mono</button>
+              <button type="button" data-editor-action="newStereo">Record new stereo</button>
+              <label for="fileInput">Open audio file</label>
+            </div>
           </div>
         </div>
       </div>
@@ -196,13 +203,14 @@
           <option value="mp3:80">MP3 80 kbps</option>
           <option value="mp3:96">MP3 96 kbps</option>
           <option value="mp3:112">MP3 112 kbps</option>
-          <option value="mp3:128">MP3 128 kbps</option>
+          <option value="mp3:128" selected>MP3 128 kbps</option>
           <option value="mp3:160">MP3 160 kbps</option>
           <option value="mp3:192">MP3 192 kbps</option>
           <option value="mp3:224">MP3 224 kbps</option>
-          <option value="mp3:256" selected>MP3 256 kbps</option>
+          <option value="mp3:256">MP3 256 kbps</option>
           <option value="mp3:320">MP3 320 kbps</option>
           <option value="wav">WAV 16-bit</option>
+          <option value="wav24">WAV 24-bit</option>
         </select>
         <button class="compact-btn export" id="exportBtn" disabled>Export</button>
         <button class="compact-btn" id="newBtn">New</button>

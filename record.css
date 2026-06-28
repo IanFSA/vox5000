@@ -163,10 +163,9 @@
 .time-stack {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 3px;
   background: #050505;
   border: 1px solid #333;
-  padding: 7px 10px;
+  padding: 10px 12px;
 }
 
 .time-display {
@@ -271,6 +270,7 @@
 }
 
 .channel-strip {
+  box-sizing: border-box;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -395,10 +395,51 @@
   position: absolute;
   inset: 0;
   display: grid;
+  align-content: center;
   place-items: center;
+  gap: 10px;
   color: var(--text3);
   font-size: 13px;
+  text-align: center;
   pointer-events: none;
+}
+
+.timeline-hint strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.timeline-hint span {
+  max-width: 460px;
+  line-height: 1.4;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.empty-actions button,
+.empty-actions label {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #151515;
+  color: var(--text);
+  font: 800 12px var(--font);
+  cursor: pointer;
+}
+
+.empty-actions button:hover,
+.empty-actions label:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
 }
 
 .editor-footerbar {
@@ -922,6 +963,24 @@
 }
 
 @media (max-width: 640px) {
+  .editor-menubar {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .editor-room-link {
+    display: none;
+  }
+
+  .editor-menus {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .editor-menus::-webkit-scrollbar {
+    display: none;
+  }
+
   .editor-logo img {
     height: 15px;
   }
@@ -935,8 +994,29 @@
     font-size: 24px;
   }
 
+  .editor-toolbar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .time-stack {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tool-group,
+  .selection-stack {
+    display: none;
+  }
+
+  .transport-group {
+    justify-content: space-between;
+  }
+
   .square-btn {
-    width: 32px;
+    width: 42px;
+    height: 36px;
   }
 
   .editor-footerbar {

@@ -144,7 +144,7 @@ const defaultSettings = {
   bgColor: '#030303',
   markerColor: '#ff3b3b',
   gridColor: '#2a2a2a',
-  bitrate: '256',
+  bitrate: '128',
   sampleRate: '48000',
   zoom: 'fit',
   inputChannels: '1',
@@ -167,6 +167,7 @@ const defaultShortcuts = {
 let shortcuts = loadShortcuts();
 let settings = loadSettings();
 let meterRafId = 0;
+let effectPreviewRefreshTimer = 0;
 
 function ensureAudioContext() {
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: Number(settings.sampleRate || 48000) });
@@ -393,6 +394,32 @@ function restoreProjectState(state) {
 function createBlankBuffer(channels) {
   const ctx = ensureAudioContext();
   return ctx.createBuffer(channels, ctx.sampleRate, ctx.sampleRate);
+}
+
+function channelPeak(src, channel) {
+  const data = src.getChannelData(channel);
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  return peak;
+}
+
+function normalizeRecordedBuffer(src) {
+  if (!src || src.numberOfChannels < 2) return src;
+  const leftPeak = channelPeak(src, 0);
+  const rightPeak = channelPeak(src, 1);
+  if (leftPeak > 0.002 && rightPeak < leftPeak * 0.08) {
+    const ctx = ensureAudioContext();
+    const out = ctx.createBuffer(1, src.length, src.sampleRate);
+    out.copyToChannel(src.getChannelData(0), 0);
+    return out;
+  }
+  if (rightPeak > 0.002 && leftPeak < rightPeak * 0.08) {
+    const ctx = ensureAudioContext();
+    const out = ctx.createBuffer(1, src.length, src.sampleRate);
+    out.copyToChannel(src.getChannelData(1), 0);
+    return out;
+  }
+  return src;
 }
 
 function newChannelFile(channels) {
@@ -731,7 +758,7 @@ async function startRecording() {
     els.record.innerHTML = '<span class="record-dot"></span>';
     updateControls();
     const blob = new Blob(recordChunks, { type: 'audio/webm' });
-    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const decoded = normalizeRecordedBuffer(await ctx.decodeAudioData(await blob.arrayBuffer()));
     if (buffer) pushUndo();
     undoStack = buffer ? undoStack : [];
     redoStack = [];
@@ -905,16 +932,6 @@ function showRecentProjects() {
 
 function closeRecentProjects() {
   if (els.recentModal) els.recentModal.hidden = true;
-}
-
-function bindLaunchFiles() {
-  if (!('launchQueue' in window)) return;
-  window.launchQueue.setConsumer(async launchParams => {
-    if (!launchParams.files || !launchParams.files.length) return;
-    const handle = launchParams.files[0];
-    const file = await handle.getFile();
-    await openProjectFile(file);
-  });
 }
 
 function stopPlayback() {
@@ -1185,6 +1202,12 @@ function clampSample(value) {
 function openEffectDialog(config) {
   if (!els.effectModal || !els.effectFields || !els.effectApply) return;
   stopEffectPreview();
+  let previewing = false;
+  const refreshPreview = () => {
+    if (!previewing || !config.preview) return;
+    clearTimeout(effectPreviewRefreshTimer);
+    effectPreviewRefreshTimer = setTimeout(() => config.preview(values), 90);
+  };
   if (els.effectKicker) els.effectKicker.textContent = config.kicker || 'Audio';
   if (els.effectTitle) els.effectTitle.textContent = config.title || 'Audio effect';
   if (els.effectCopy) els.effectCopy.textContent = config.copy || '';
@@ -1212,6 +1235,7 @@ function openEffectDialog(config) {
       values[field.name] = Number(value);
       slider.value = value;
       number.value = value;
+      refreshPreview();
     };
     slider.addEventListener('input', () => sync(slider.value));
     number.addEventListener('input', () => sync(number.value));
@@ -1233,11 +1257,15 @@ function openEffectDialog(config) {
   };
   if (els.effectPreview) {
     els.effectPreview.onclick = () => {
+      previewing = true;
       if (config.preview) config.preview(values);
       else setStatus('Preview is not available for this effect');
     };
   }
-  if (els.effectPreviewStop) els.effectPreviewStop.onclick = stopEffectPreview;
+  if (els.effectPreviewStop) els.effectPreviewStop.onclick = () => {
+    previewing = false;
+    stopEffectPreview();
+  };
   els.effectModal.hidden = false;
 }
 
@@ -1250,6 +1278,7 @@ function closeEffectDialog() {
 }
 
 function stopEffectPreview() {
+  clearTimeout(effectPreviewRefreshTimer);
   if (!previewNode) return;
   try { previewNode.stop(); } catch {}
   try { previewNode.disconnect(); } catch {}
@@ -1309,6 +1338,52 @@ function reverseAudio() {
       right -= 1;
     }
   });
+}
+
+function mixDownToMono() {
+  if (!buffer) return;
+  if (buffer.numberOfChannels === 1) {
+    setStatus('Already mono');
+    return;
+  }
+  pushUndo();
+  const ctx = ensureAudioContext();
+  const out = ctx.createBuffer(1, buffer.length, buffer.sampleRate);
+  const dst = out.getChannelData(0);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    for (let i = 0; i < buffer.length; i++) dst[i] += src[i] / buffer.numberOfChannels;
+  }
+  const keptMarkers = cloneMarkers();
+  const keptSelection = cloneSelection(selection);
+  setBuffer(out, fileName);
+  markers = keptMarkers;
+  selection = keptSelection;
+  drawWaveform();
+  drawOverview();
+  setStatus('Mixed down to mono');
+}
+
+function mixDownToStereo() {
+  if (!buffer) return;
+  if (buffer.numberOfChannels === 2) {
+    setStatus('Already stereo');
+    return;
+  }
+  pushUndo();
+  const ctx = ensureAudioContext();
+  const out = ctx.createBuffer(2, buffer.length, buffer.sampleRate);
+  const mono = buffer.getChannelData(0);
+  out.copyToChannel(mono, 0);
+  out.copyToChannel(mono, 1);
+  const keptMarkers = cloneMarkers();
+  const keptSelection = cloneSelection(selection);
+  setBuffer(out, fileName);
+  markers = keptMarkers;
+  selection = keptSelection;
+  drawWaveform();
+  drawOverview();
+  setStatus('Mixed down to stereo');
 }
 
 function normalize() {
@@ -1928,9 +2003,9 @@ function mixToMono(src) {
   return out;
 }
 
-function encodeWav(src) {
+function encodeWav(src, bitDepth = 16) {
   const channels = src.numberOfChannels;
-  const bytesPerSample = 2;
+  const bytesPerSample = bitDepth === 24 ? 3 : 2;
   const blockAlign = channels * bytesPerSample;
   const byteRate = src.sampleRate * blockAlign;
   const dataSize = src.length * blockAlign;
@@ -1947,14 +2022,21 @@ function encodeWav(src) {
   view.setUint32(24, src.sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(34, bitDepth, true);
   write(36, 'data');
   view.setUint32(40, dataSize, true);
   let offset = 44;
   for (let i = 0; i < src.length; i++) {
-    for (let ch = 0; ch < channels; ch++, offset += 2) {
+    for (let ch = 0; ch < channels; ch++, offset += bytesPerSample) {
       const s = Math.max(-1, Math.min(1, src.getChannelData(ch)[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      if (bitDepth === 24) {
+        const sample = Math.round(s < 0 ? s * 0x800000 : s * 0x7FFFFF);
+        view.setUint8(offset, sample & 0xFF);
+        view.setUint8(offset + 1, (sample >> 8) & 0xFF);
+        view.setUint8(offset + 2, (sample >> 16) & 0xFF);
+      } else {
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
     }
   }
   return new Blob([bufferOut], { type: 'audio/wav' });
@@ -2002,9 +2084,10 @@ async function exportFile() {
   els.export.disabled = true;
   setStatus('Exporting');
   const format = els.exportFormat.value;
-  const isWav = format === 'wav';
+  const isWav = format === 'wav' || format === 'wav24';
   const bitrate = isWav ? 0 : Number((format.split(':')[1] || 256));
-  const blob = isWav ? encodeWav(buffer) : await encodeMp3(buffer, bitrate);
+  const bitDepth = format === 'wav24' ? 24 : 16;
+  const blob = isWav ? encodeWav(buffer, bitDepth) : await encodeMp3(buffer, bitrate);
   const ext = isWav ? 'wav' : 'mp3';
   const url = URL.createObjectURL(blob);
   els.download.innerHTML = '';
@@ -2012,7 +2095,7 @@ async function exportFile() {
   a.href = url;
   a.download = `${fileName || 'Vox5000'}.${ext}`;
   a.className = 'dl-btn';
-  a.textContent = `Download ${isWav ? 'WAV' : `MP3 ${bitrate} kbps`} · ${(blob.size / 1048576).toFixed(1)} MB`;
+  a.textContent = `Download ${isWav ? `WAV ${bitDepth}-bit` : `MP3 ${bitrate} kbps`} · ${(blob.size / 1048576).toFixed(1)} MB`;
   els.download.appendChild(a);
   els.export.disabled = false;
   setStatus('Export ready');
@@ -2366,6 +2449,8 @@ function bindEvents() {
       new: newSession,
       newMono: () => newChannelFile(1),
       newStereo: () => newChannelFile(2),
+      mixMono: mixDownToMono,
+      mixStereo: mixDownToStereo,
       undo,
       redo,
       copy: copySelection,
@@ -2410,7 +2495,8 @@ function bindEvents() {
     stage.addEventListener('drop', event => {
       event.preventDefault();
       const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-      importFile(file);
+      if (file && file.name.toLowerCase().endsWith('.vox5000')) openProjectFile(file);
+      else importFile(file);
     });
   }
 
@@ -2424,7 +2510,6 @@ function bindEvents() {
 
 bindEvents();
 applySettingsToUi();
-bindLaunchFiles();
 initMics();
 normalizeShortcutDefaults();
 restoreWaveSize();
