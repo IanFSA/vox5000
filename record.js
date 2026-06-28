@@ -14,6 +14,8 @@ const els = {
   stop: $('stopBtn'),
   play: $('playBtn'),
   rewind: $('rewindBtn'),
+  end: $('endBtn'),
+  insertSilenceBtn: $('insertSilenceBtn'),
   time: $('timeDisplay'),
   canvas: $('waveCanvas'),
   hint: $('timelineHint'),
@@ -58,6 +60,14 @@ const els = {
   shortcutClose: $('shortcutClose'),
   shortcutReset: $('shortcutReset'),
   shortcutSave: $('shortcutSave'),
+  effectModal: $('effectModal'),
+  effectKicker: $('effectKicker'),
+  effectTitle: $('effectTitle'),
+  effectCopy: $('effectCopy'),
+  effectFields: $('effectFields'),
+  effectClose: $('effectCloseBtn'),
+  effectCancel: $('effectCancelBtn'),
+  effectApply: $('effectApplyBtn'),
 };
 
 let audioCtx;
@@ -72,10 +82,14 @@ let timerId;
 let sourceNode;
 let playStartedAt = 0;
 let playOffset = 0;
+let playEndAt = 0;
+let playSelectionActive = false;
 let rafId;
 let buffer = null;
 let fileName = 'Vox5000';
 let selection = null;
+let hoverTime = null;
+let markers = [];
 let dragging = false;
 let dragStart = 0;
 let dragStartX = 0;
@@ -99,6 +113,8 @@ const defaultShortcuts = {
   playPause: 'Space',
   record: 'R',
   returnToStart: 'Enter',
+  returnToEnd: 'Shift+Enter',
+  insertSilence: 'I',
   deleteSelection: 'Delete',
   undo: 'Ctrl+Z',
   redo: 'Ctrl+Y',
@@ -343,7 +359,11 @@ function setBuffer(next, name) {
   buffer = next;
   fileName = name || fileName || 'Vox5000';
   selection = null;
+  hoverTime = null;
+  markers = [];
   playOffset = 0;
+  playEndAt = 0;
+  playSelectionActive = false;
   visibleStart = 0;
   zoom = 1;
   if (buffer) desiredChannels = buffer.numberOfChannels > 1 ? 2 : 1;
@@ -357,9 +377,12 @@ function setBuffer(next, name) {
 function updateControls() {
   const hasAudio = Boolean(buffer);
   const hasSelection = Boolean(selection && selection.end > selection.start);
-  [els.play, els.rewind, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.limit, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
+  const isRecording = Boolean(recorder && recorder.state === 'recording');
+  const isPlaying = Boolean(sourceNode);
+  [els.play, els.rewind, els.end, els.insertSilenceBtn, els.trim, els.del, els.split, els.fadeIn, els.fadeOut, els.normalize, els.compress, els.limit, els.noise, els.silence, els.eq, els.eqOpen, els.export].forEach(btn => {
     if (btn) btn.disabled = !hasAudio;
   });
+  if (els.stop) els.stop.disabled = !(isRecording || isPlaying);
   [els.trim, els.del, els.fadeIn, els.fadeOut].forEach(btn => {
     if (btn) btn.disabled = !hasSelection;
   });
@@ -372,7 +395,7 @@ function updateControls() {
       ? `Selection: ${fmtTime(selection.start)} - ${fmtTime(selection.end)}`
       : 'Selection: none';
   }
-  if (els.selectionStart) els.selectionStart.textContent = hasSelection ? fmtTime(selection.start) : '--:--.---';
+  if (els.selectionStart) els.selectionStart.textContent = hasSelection ? fmtTime(selection.start) : (hoverTime !== null ? fmtTime(hoverTime) : '--:--.---');
   if (els.selectionEnd) els.selectionEnd.textContent = hasSelection ? fmtTime(selection.end) : '--:--.---';
   if (els.selectionLength) els.selectionLength.textContent = hasSelection ? fmtTime(selection.end - selection.start) : '--:--.---';
   if (els.format) {
@@ -557,7 +580,7 @@ async function startRecording() {
     inputGain.disconnect(dest);
     els.record.classList.remove('active');
     els.record.innerHTML = '<span class="record-dot"></span>';
-    els.stop.disabled = true;
+    updateControls();
     const blob = new Blob(recordChunks, { type: 'audio/webm' });
     const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
     if (buffer) pushUndo();
@@ -572,7 +595,7 @@ async function startRecording() {
   recordStartedAt = Date.now();
   els.record.classList.add('active');
   els.record.innerHTML = '<span class="record-dot"></span>';
-  els.stop.disabled = false;
+  updateControls();
   setStatus('Recording');
   startRecordingPreview();
   timerId = setInterval(() => {
@@ -582,6 +605,17 @@ async function startRecording() {
 
 function stopRecording() {
   if (recorder && recorder.state !== 'inactive') recorder.stop();
+}
+
+function stopTransport() {
+  if (recorder && recorder.state === 'recording') {
+    stopRecording();
+    return;
+  }
+  stopPlayback();
+  updateControls();
+  drawWaveform();
+  drawOverview();
 }
 
 async function importFile(file) {
@@ -600,8 +634,11 @@ function stopPlayback() {
     sourceNode.disconnect();
     sourceNode = null;
   }
+  playEndAt = 0;
+  playSelectionActive = false;
   cancelAnimationFrame(rafId);
   if (els.play) els.play.textContent = '▶';
+  updateControls();
 }
 
 function clearSelection() {
@@ -621,6 +658,17 @@ function returnToStart() {
   setStatus('Returned to start');
 }
 
+function returnToEnd() {
+  if (!buffer) return;
+  playOffset = buffer.duration;
+  visibleStart = Math.max(0, buffer.duration - visibleDuration());
+  stopPlayback();
+  if (els.time) els.time.textContent = fmtTime(playOffset);
+  drawWaveform();
+  drawOverview();
+  setStatus('Moved to end');
+}
+
 function selectAllAudio() {
   if (!buffer) return;
   selection = { start: 0, end: buffer.duration };
@@ -635,7 +683,7 @@ function selectAllAudio() {
 function playPause() {
   if (!buffer) return;
   if (sourceNode) {
-    playOffset = Math.min(buffer.duration, playOffset + (ensureAudioContext().currentTime - playStartedAt));
+    playOffset = Math.min(playEndAt || buffer.duration, playOffset + (ensureAudioContext().currentTime - playStartedAt));
     stopPlayback();
     drawWaveform();
     return;
@@ -644,21 +692,27 @@ function playPause() {
   sourceNode = ctx.createBufferSource();
   sourceNode.buffer = buffer;
   sourceNode.connect(ctx.destination);
-  if (playOffset >= buffer.duration) playOffset = 0;
+  const selected = selection && selection.end > selection.start;
+  const startAt = selected ? selection.start : (playOffset >= buffer.duration ? 0 : playOffset);
+  const endAt = selected ? selection.end : buffer.duration;
+  playOffset = startAt;
+  playEndAt = endAt;
+  playSelectionActive = Boolean(selected);
   playStartedAt = ctx.currentTime;
-  sourceNode.start(0, playOffset);
+  sourceNode.start(0, startAt, Math.max(0.01, endAt - startAt));
   sourceNode.onended = () => {
-    playOffset = 0;
+    playOffset = playSelectionActive ? startAt : 0;
     stopPlayback();
     drawWaveform();
   };
   if (els.play) els.play.textContent = 'Ⅱ';
+  updateControls();
   animatePlayhead();
 }
 
 function currentPlayhead() {
   if (!sourceNode) return playOffset;
-  return Math.min(buffer ? buffer.duration : 0, playOffset + (ensureAudioContext().currentTime - playStartedAt));
+  return Math.min(playEndAt || (buffer ? buffer.duration : 0), playOffset + (ensureAudioContext().currentTime - playStartedAt));
 }
 
 function animatePlayhead() {
@@ -761,16 +815,85 @@ function splitAtPlayhead() {
   setStatus('Split point set. Right-hand region selected.');
 }
 
+function addMarker() {
+  if (!buffer) return;
+  const time = Math.max(0, Math.min(buffer.duration, currentPlayhead()));
+  markers.push({ id: Date.now(), time });
+  markers.sort((a, b) => a.time - b.time);
+  drawWaveform();
+  drawOverview();
+  setStatus(`Marker added at ${fmtTime(time)}`);
+}
+
 function processSamples(label, fn) {
   if (!buffer) return;
   pushUndo();
   const out = cloneBuffer(buffer);
+  const keptMarkers = markers.slice();
   const range = selectionSamples() || { start: 0, end: out.length };
   for (let ch = 0; ch < out.numberOfChannels; ch++) {
     fn(out.getChannelData(ch), range.start, range.end, out.sampleRate);
   }
   setBuffer(out, fileName);
+  markers = keptMarkers.filter(marker => marker.time <= (buffer ? buffer.duration : 0));
+  drawWaveform();
+  drawOverview();
   setStatus(label);
+}
+
+function dbToGain(db) {
+  return Math.pow(10, Number(db || 0) / 20);
+}
+
+function clampSample(value) {
+  return Math.max(-1, Math.min(1, value));
+}
+
+function openEffectDialog(config) {
+  if (!els.effectModal || !els.effectFields || !els.effectApply) return;
+  if (els.effectKicker) els.effectKicker.textContent = config.kicker || 'Audio';
+  if (els.effectTitle) els.effectTitle.textContent = config.title || 'Audio effect';
+  if (els.effectCopy) els.effectCopy.textContent = config.copy || '';
+  els.effectFields.innerHTML = '';
+  const values = {};
+  (config.fields || []).forEach(field => {
+    values[field.name] = field.value;
+    const row = document.createElement('label');
+    row.className = 'effect-row';
+    const name = document.createElement('span');
+    name.textContent = field.label;
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = field.min;
+    slider.max = field.max;
+    slider.step = field.step || 1;
+    slider.value = field.value;
+    const number = document.createElement('input');
+    number.type = 'number';
+    number.min = field.min;
+    number.max = field.max;
+    number.step = field.step || 1;
+    number.value = field.value;
+    const sync = value => {
+      values[field.name] = Number(value);
+      slider.value = value;
+      number.value = value;
+    };
+    slider.addEventListener('input', () => sync(slider.value));
+    number.addEventListener('input', () => sync(number.value));
+    row.append(name, slider, number);
+    els.effectFields.appendChild(row);
+  });
+  els.effectApply.onclick = () => {
+    config.apply(values);
+    closeEffectDialog();
+  };
+  els.effectModal.hidden = false;
+}
+
+function closeEffectDialog() {
+  if (els.effectModal) els.effectModal.hidden = true;
+  if (els.effectApply) els.effectApply.onclick = null;
 }
 
 function fadeIn() {
@@ -788,55 +911,180 @@ function fadeOut() {
 }
 
 function normalize() {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Normalize',
+    copy: 'Set the loudest point of the selection, or the whole file, to a target peak level.',
+    fields: [{ name: 'targetDb', label: 'Target peak dB', min: -24, max: 0, step: 0.5, value: -1 }],
+    apply: values => applyNormalize(values.targetDb),
+  });
+}
+
+function applyNormalize(targetDb) {
+  if (!buffer) return;
+  const range = selectionSamples() || { start: 0, end: buffer.length };
   let peak = 0;
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const data = buffer.getChannelData(ch);
-    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    for (let i = range.start; i < range.end; i++) peak = Math.max(peak, Math.abs(data[i]));
   }
-  if (!peak) return;
-  processSamples('Normalized', data => {
-    const gain = 0.94 / peak;
-    for (let i = 0; i < data.length; i++) data[i] = Math.max(-1, Math.min(1, data[i] * gain));
+  if (!peak) {
+    setStatus('Nothing to normalize');
+    return;
+  }
+  const gain = dbToGain(targetDb) / peak;
+  processSamples(`Normalized to ${targetDb} dB`, (data, start, end) => {
+    for (let i = start; i < end; i++) data[i] = clampSample(data[i] * gain);
+  });
+}
+
+function amplifyVolume() {
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Amplify volume',
+    copy: 'Move below 0 dB to make the audio softer, or above 0 dB to make it louder.',
+    fields: [{ name: 'gainDb', label: 'Gain dB', min: -24, max: 24, step: 0.5, value: 0 }],
+    apply: values => {
+      const gain = dbToGain(values.gainDb);
+      processSamples(`Amplified ${values.gainDb > 0 ? '+' : ''}${values.gainDb} dB`, (data, start, end) => {
+        for (let i = start; i < end; i++) data[i] = clampSample(data[i] * gain);
+      });
+    },
   });
 }
 
 function compressVoice() {
-  processSamples('Voice compression applied', (data, start, end) => {
-    const threshold = 0.22;
-    const ratio = 3.5;
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Compressor',
+    copy: 'Control loud peaks without crushing the track. Start gently, then adjust threshold and ratio.',
+    fields: [
+      { name: 'thresholdDb', label: 'Threshold dB', min: -60, max: 0, step: 1, value: -12 },
+      { name: 'ratio', label: 'Ratio', min: 1, max: 20, step: 0.1, value: 3 },
+      { name: 'attackMs', label: 'Attack ms', min: 0, max: 100, step: 1, value: 8 },
+      { name: 'releaseMs', label: 'Release ms', min: 20, max: 1000, step: 10, value: 220 },
+      { name: 'makeupDb', label: 'Post gain dB', min: -12, max: 24, step: 0.5, value: 2 },
+    ],
+    apply: values => applyCompressor(values),
+  });
+}
+
+function applyCompressor(values) {
+  const threshold = dbToGain(values.thresholdDb);
+  const ratio = Math.max(1, Number(values.ratio || 1));
+  const makeup = dbToGain(values.makeupDb);
+  processSamples('Compressor applied', (data, start, end) => {
+    let envelope = 0;
+    const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
+    const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
     for (let i = start; i < end; i++) {
-      const sign = Math.sign(data[i]);
       const abs = Math.abs(data[i]);
-      data[i] = sign * (abs > threshold ? threshold + (abs - threshold) / ratio : abs);
+      envelope = abs > envelope
+        ? attack * envelope + (1 - attack) * abs
+        : release * envelope + (1 - release) * abs;
+      let gain = 1;
+      if (envelope > threshold) {
+        const compressed = threshold + (envelope - threshold) / ratio;
+        gain = compressed / Math.max(envelope, 0.000001);
+      }
+      data[i] = clampSample(data[i] * gain * makeup);
     }
   });
 }
 
 function limiter() {
-  processSamples('Limiter applied', (data, start, end) => {
-    for (let i = start; i < end; i++) data[i] = Math.max(-0.92, Math.min(0.92, data[i]));
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Hard limiter',
+    copy: 'Set a ceiling for peaks. Drive adds level before the limiter catches the loudest parts.',
+    fields: [
+      { name: 'ceilingDb', label: 'Ceiling dB', min: -24, max: 0, step: 0.5, value: -1 },
+      { name: 'driveDb', label: 'Drive dB', min: 0, max: 24, step: 0.5, value: 0 },
+    ],
+    apply: values => {
+      const ceiling = dbToGain(values.ceilingDb);
+      const drive = dbToGain(values.driveDb);
+      processSamples('Limiter applied', (data, start, end) => {
+        for (let i = start; i < end; i++) data[i] = Math.max(-ceiling, Math.min(ceiling, data[i] * drive));
+      });
+    },
   });
 }
 
 function noiseGate() {
-  processSamples('Noise gate applied', (data, start, end) => {
-    const threshold = 0.018;
-    for (let i = start; i < end; i++) if (Math.abs(data[i]) < threshold) data[i] *= 0.12;
+  if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Noise gate',
+    copy: 'Reduce low-level room noise between words. Use a lower threshold if it cuts off speech.',
+    fields: [
+      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -45 },
+      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -45 },
+    ],
+    apply: values => {
+      const threshold = dbToGain(values.thresholdDb);
+      const reduction = dbToGain(values.reductionDb);
+      processSamples('Noise gate applied', (data, start, end) => {
+        for (let i = start; i < end; i++) if (Math.abs(data[i]) < threshold) data[i] *= reduction;
+      });
+    },
   });
 }
 
 function removeSilence() {
   if (!buffer) return;
-  pushUndo();
-  const frame = 1024;
-  const keep = [];
-  const mono = buffer.getChannelData(0);
-  for (let i = 0; i < mono.length; i += frame) {
+  openEffectDialog({
+    kicker: 'Filter',
+    title: 'Remove silence',
+    copy: 'Remove quiet sections below the threshold, with a little padding kept around speech.',
+    fields: [
+      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -45 },
+      { name: 'minSilenceMs', label: 'Minimum silence ms', min: 50, max: 2000, step: 10, value: 250 },
+      { name: 'paddingMs', label: 'Padding ms', min: 0, max: 500, step: 10, value: 80 },
+    ],
+    apply: values => applyRemoveSilence(values),
+  });
+}
+
+function applyRemoveSilence(values) {
+  if (!buffer) return;
+  const keptMarkers = markers.slice();
+  const threshold = dbToGain(values.thresholdDb);
+  const frame = 512;
+  const minSilentFrames = Math.max(1, Math.round((values.minSilenceMs / 1000) * buffer.sampleRate / frame));
+  const padding = Math.round((values.paddingMs / 1000) * buffer.sampleRate);
+  const voiced = [];
+  for (let i = 0; i < buffer.length; i += frame) {
     let peak = 0;
-    for (let j = i; j < Math.min(i + frame, mono.length); j++) peak = Math.max(peak, Math.abs(mono[j]));
-    if (peak > 0.012) keep.push([i, Math.min(i + frame, mono.length)]);
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let j = i; j < Math.min(i + frame, buffer.length); j++) peak = Math.max(peak, Math.abs(data[j]));
+    }
+    voiced.push(peak >= threshold);
   }
-  if (!keep.length) return;
+  const keep = [];
+  let silentRun = 0;
+  for (let idx = 0; idx < voiced.length; idx++) {
+    if (!voiced[idx]) {
+      silentRun += 1;
+      if (silentRun >= minSilentFrames) continue;
+    } else {
+      silentRun = 0;
+    }
+    const start = Math.max(0, idx * frame - padding);
+    const end = Math.min(buffer.length, (idx + 1) * frame + padding);
+    if (keep.length && start <= keep[keep.length - 1][1]) keep[keep.length - 1][1] = Math.max(keep[keep.length - 1][1], end);
+    else keep.push([start, end]);
+  }
+  if (!keep.length) {
+    setStatus('No audio found above silence threshold');
+    return;
+  }
+  pushUndo();
   const total = keep.reduce((sum, part) => sum + part[1] - part[0], 0);
   const ctx = ensureAudioContext();
   const out = ctx.createBuffer(buffer.numberOfChannels, total, buffer.sampleRate);
@@ -850,15 +1098,30 @@ function removeSilence() {
     });
   }
   setBuffer(out, fileName);
+  markers = keptMarkers.filter(marker => marker.time <= out.duration);
+  drawWaveform();
+  drawOverview();
   setStatus('Silence removed');
 }
 
 function insertSilence() {
   if (!buffer) return;
+  openEffectDialog({
+    kicker: 'Insert',
+    title: 'Insert silence',
+    copy: 'Insert silence at the playhead. Click the waveform first to choose the position.',
+    fields: [{ name: 'duration', label: 'Duration seconds', min: 0.1, max: 30, step: 0.1, value: 1 }],
+    apply: values => applyInsertSilence(values.duration),
+  });
+}
+
+function applyInsertSilence(duration) {
+  if (!buffer) return;
   pushUndo();
   const ctx = ensureAudioContext();
+  const keptMarkers = markers.slice();
   const insertAt = secondsToSamples(playOffset);
-  const silenceLength = Math.max(1, Math.round(buffer.sampleRate));
+  const silenceLength = Math.max(1, Math.round(buffer.sampleRate * Number(duration || 1)));
   const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + silenceLength, buffer.sampleRate);
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const src = buffer.getChannelData(ch);
@@ -867,8 +1130,13 @@ function insertSilence() {
     dst.set(src.slice(insertAt), insertAt + silenceLength);
   }
   setBuffer(out, fileName);
+  markers = keptMarkers.map(marker => marker.time >= samplesToSeconds(insertAt)
+    ? { ...marker, time: marker.time + samplesToSeconds(silenceLength) }
+    : marker);
   playOffset = samplesToSeconds(insertAt + silenceLength);
-  setStatus('Inserted 1 second of silence');
+  drawWaveform();
+  drawOverview();
+  setStatus(`Inserted ${Number(duration || 1).toFixed(1)} seconds of silence`);
 }
 
 async function applyEq() {
@@ -1026,6 +1294,26 @@ function drawWaveform() {
     canvasCtx.strokeRect(left, 0, Math.max(0, right - left), h);
   }
 
+  markers.forEach((marker, index) => {
+    if (marker.time < visibleStart || marker.time > visibleStart + viewDuration) return;
+    const x = ((marker.time - visibleStart) / viewDuration) * w;
+    canvasCtx.strokeStyle = '#dfff00';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(x, 0);
+    canvasCtx.lineTo(x, h);
+    canvasCtx.stroke();
+    canvasCtx.fillStyle = '#dfff00';
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(x - 5, 0);
+    canvasCtx.lineTo(x + 5, 0);
+    canvasCtx.lineTo(x, 8);
+    canvasCtx.closePath();
+    canvasCtx.fill();
+    canvasCtx.font = '10px JetBrains Mono, monospace';
+    canvasCtx.fillText(String(index + 1), x + 4, 18);
+  });
+
   const playX = ((currentPlayhead() - visibleStart) / viewDuration) * w;
   if (playX >= 0 && playX <= w) {
     canvasCtx.strokeStyle = '#ff3b3b';
@@ -1113,6 +1401,16 @@ function drawOverview() {
   overviewCtx.strokeStyle = '#c76bff';
   overviewCtx.lineWidth = 2;
   overviewCtx.strokeRect(x1, top + 1, Math.max(3, x2 - x1), Math.max(3, waveHeight - 2));
+
+  markers.forEach(marker => {
+    const x = (marker.time / buffer.duration) * w;
+    overviewCtx.strokeStyle = '#dfff00';
+    overviewCtx.lineWidth = 1;
+    overviewCtx.beginPath();
+    overviewCtx.moveTo(x, top);
+    overviewCtx.lineTo(x, rulerTop);
+    overviewCtx.stroke();
+  });
 
   const playX = (currentPlayhead() / buffer.duration) * w;
   overviewCtx.strokeStyle = '#dfff00';
@@ -1226,7 +1524,11 @@ function newSession() {
   stopPlayback();
   buffer = null;
   selection = null;
+  hoverTime = null;
+  markers = [];
   playOffset = 0;
+  playEndAt = 0;
+  playSelectionActive = false;
   visibleStart = 0;
   zoom = 1;
   undoStack = [];
@@ -1311,12 +1613,20 @@ function handleEditorShortcut(event) {
     closeMenus();
     closeShortcuts();
     closeEq();
+    closeEffectDialog();
     finishWaveDrag(event);
     return;
   }
   if (isTypingTarget(event.target)) return;
   const key = event.key.toLowerCase();
   const mod = event.metaKey || event.ctrlKey;
+
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (recorder && recorder.state === 'recording') stopRecording();
+    else if (buffer) playPause();
+    return;
+  }
 
   if (mod && key === 'z') {
     event.preventDefault();
@@ -1340,18 +1650,15 @@ function handleEditorShortcut(event) {
   }
   if (event.key === 'Enter' && buffer) {
     event.preventDefault();
-    returnToStart();
-    return;
-  }
-  if (event.code === 'Space' && buffer) {
-    event.preventDefault();
-    playPause();
+    event.shiftKey ? returnToEnd() : returnToStart();
     return;
   }
   const actionByShortcut = [
     ['playPause', playPause],
     ['record', startRecording],
     ['returnToStart', returnToStart],
+    ['returnToEnd', returnToEnd],
+    ['insertSilence', insertSilence],
     ['deleteSelection', deleteSelection],
     ['selectAll', selectAllAudio],
     ['undo', undo],
@@ -1359,7 +1666,7 @@ function handleEditorShortcut(event) {
     ['cutSplit', cutOrSplit],
     ['copy', copySelection],
     ['paste', pasteClipboard],
-    ['marker', () => setStatus(`Marker noted at ${fmtTime(currentPlayhead())}`)],
+    ['marker', addMarker],
   ];
   for (const [name, action] of actionByShortcut) {
     if (shortcutMatches(event, shortcuts[name])) {
@@ -1375,9 +1682,11 @@ function bindEvents() {
   if (els.file) els.file.addEventListener('change', () => importFile(els.file.files[0]));
   if (els.newBtn) els.newBtn.addEventListener('click', newSession);
   if (els.record) els.record.addEventListener('click', startRecording);
-  if (els.stop) els.stop.addEventListener('click', stopRecording);
+  if (els.stop) els.stop.addEventListener('click', stopTransport);
   if (els.play) els.play.addEventListener('click', playPause);
   if (els.rewind) els.rewind.addEventListener('click', () => { playOffset = 0; stopPlayback(); drawWaveform(); });
+  if (els.end) els.end.addEventListener('click', returnToEnd);
+  if (els.insertSilenceBtn) els.insertSilenceBtn.addEventListener('click', insertSilence);
   if (els.trim) els.trim.addEventListener('click', trimSelection);
   if (els.del) els.del.addEventListener('click', deleteSelection);
   if (els.split) els.split.addEventListener('click', splitAtPlayhead);
@@ -1391,6 +1700,8 @@ function bindEvents() {
   if (els.eq) els.eq.addEventListener('click', applyEq);
   if (els.eqOpen) els.eqOpen.addEventListener('click', showEq);
   if (els.eqClose) els.eqClose.addEventListener('click', closeEq);
+  if (els.effectClose) els.effectClose.addEventListener('click', closeEffectDialog);
+  if (els.effectCancel) els.effectCancel.addEventListener('click', closeEffectDialog);
   if (els.eqReset) els.eqReset.addEventListener('click', () => setEqValues(0, 0, 0));
   if (els.eqPreset) els.eqPreset.addEventListener('change', applyEqPreset);
   [els.lowEq, els.midEq, els.highEq].forEach(slider => {
@@ -1450,7 +1761,12 @@ function bindEvents() {
       els.canvas.setPointerCapture(event.pointerId);
     });
     els.canvas.addEventListener('pointermove', event => {
-      if (!buffer || !dragging) return;
+      if (!buffer) return;
+      hoverTime = canvasPointToSeconds(event);
+      if (!dragging) {
+        updateControls();
+        return;
+      }
       if (!selectionDragMoved && Math.abs(event.clientX - dragStartX) < 4) return;
       selectionDragMoved = true;
       els.canvas.classList.add('is-selecting');
@@ -1461,6 +1777,10 @@ function bindEvents() {
       drawOverview();
     });
     els.canvas.addEventListener('pointerup', handleWavePointerUp);
+    els.canvas.addEventListener('pointerleave', () => {
+      hoverTime = null;
+      updateControls();
+    });
     els.canvas.addEventListener('pointercancel', event => {
       finishWaveDrag(event);
       drawWaveform();
@@ -1506,8 +1826,6 @@ function bindEvents() {
       new: newSession,
       newMono: () => newChannelFile(1),
       newStereo: () => newChannelFile(2),
-      recordMono: () => { setDesiredChannels(1); startRecording(); },
-      recordStereo: () => { setDesiredChannels(2); startRecording(); },
       undo,
       redo,
       copy: copySelection,
@@ -1515,6 +1833,7 @@ function bindEvents() {
       trim: trimSelection,
       delete: deleteSelection,
       split: splitAtPlayhead,
+      amplify: amplifyVolume,
       normalize,
       fadeIn,
       fadeOut,
@@ -1526,8 +1845,9 @@ function bindEvents() {
       insertSilence,
       eq: applyEq,
       showEq,
-      marker: () => setStatus(`Marker noted at ${fmtTime(currentPlayhead())}`),
+      marker: addMarker,
       start: returnToStart,
+      end: returnToEnd,
       clearSelection,
       zoomIn: () => setZoom(zoom * 1.4),
       zoomOut: () => setZoom(zoom / 1.4),

@@ -47,23 +47,23 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Audio</button>
           <div class="menu-popover">
-            <button data-editor-action="recordMono"><span>Record mono</span><kbd>R</kbd></button>
-            <button data-editor-action="recordStereo">Record stereo</button>
             <button data-editor-action="newMono"><span>New mono file</span></button>
             <button data-editor-action="newStereo">New stereo file</button>
             <button data-editor-action="start"><span>Return to start</span><kbd>Enter</kbd></button>
+            <button data-editor-action="end"><span>Go to end</span><kbd>Shift Enter</kbd></button>
           </div>
         </div>
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Insert</button>
           <div class="menu-popover">
-            <button data-editor-action="insertSilence">Insert silence</button>
+            <button data-editor-action="insertSilence"><span>Insert silence</span><kbd>I</kbd></button>
             <button data-editor-action="marker"><span>Marker</span><kbd>M</kbd></button>
           </div>
         </div>
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">Filter</button>
           <div class="menu-popover">
+            <button data-editor-action="amplify">Amplify volume...</button>
             <button data-editor-action="normalize">Normalize</button>
             <button data-editor-action="fadeIn">Fade in</button>
             <button data-editor-action="fadeOut">Fade out</button>
@@ -110,10 +110,12 @@
         <button class="square-btn stop" id="stopBtn" disabled title="Stop">■</button>
         <button class="square-btn play" id="playBtn" disabled title="Play or pause">▶</button>
         <button class="square-btn" id="rewindBtn" disabled title="Go to start">|◀</button>
+        <button class="square-btn" id="endBtn" disabled title="Go to end">▶|</button>
         <button class="square-btn" id="recordBtn" title="Record"><span class="record-dot"></span></button>
       </div>
 
       <div class="tool-group">
+        <button class="square-btn" id="insertSilenceBtn" disabled title="Insert silence">+0</button>
         <button class="square-btn" id="undoBtn" disabled title="Undo">↶</button>
         <button class="square-btn" id="redoBtn" disabled title="Redo">↷</button>
         <button class="square-btn" id="trimBtn" disabled title="Trim to selection">⟦⟧</button>
@@ -245,6 +247,24 @@
       </div>
     </div>
 
+    <div class="effect-modal" id="effectModal" hidden role="dialog" aria-modal="true" aria-labelledby="effectTitle">
+      <div class="effect-panel">
+        <div class="effect-head">
+          <div>
+            <p class="panel-kicker" id="effectKicker">Audio</p>
+            <h2 id="effectTitle">Audio effect</h2>
+          </div>
+          <button class="square-btn" id="effectCloseBtn" type="button" aria-label="Close effect">×</button>
+        </div>
+        <p class="effect-copy" id="effectCopy"></p>
+        <div class="effect-fields" id="effectFields"></div>
+        <div class="effect-actions">
+          <button class="compact-btn" id="effectCancelBtn" type="button">Cancel</button>
+          <button class="compact-btn export" id="effectApplyBtn" type="button">Apply</button>
+        </div>
+      </div>
+    </div>
+
     <div class="shortcut-modal" id="shortcutModal" hidden role="dialog" aria-modal="true" aria-labelledby="shortcutTitle">
       <div class="shortcut-panel">
         <div class="shortcut-head">
@@ -258,6 +278,8 @@
           <label><span>Play / pause</span><input data-shortcut-input="playPause" readonly /></label>
           <label><span>Record</span><input data-shortcut-input="record" readonly /></label>
           <label><span>Return to start</span><input data-shortcut-input="returnToStart" readonly /></label>
+          <label><span>Go to end</span><input data-shortcut-input="returnToEnd" readonly /></label>
+          <label><span>Insert silence</span><input data-shortcut-input="insertSilence" readonly /></label>
           <label><span>Delete selection</span><input data-shortcut-input="deleteSelection" readonly /></label>
           <label><span>Undo</span><input data-shortcut-input="undo" readonly /></label>
           <label><span>Redo</span><input data-shortcut-input="redo" readonly /></label>

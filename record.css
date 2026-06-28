@@ -559,7 +559,8 @@
 }
 
 .shortcut-modal,
-.eq-modal {
+.eq-modal,
+.effect-modal {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -570,12 +571,14 @@
 }
 
 .shortcut-modal[hidden],
-.eq-modal[hidden] {
+.eq-modal[hidden],
+.effect-modal[hidden] {
   display: none;
 }
 
 .shortcut-panel,
-.eq-panel {
+.eq-panel,
+.effect-panel {
   width: min(620px, 100%);
   max-height: min(760px, calc(100vh - 36px));
   overflow: auto;
@@ -587,7 +590,8 @@
 }
 
 .shortcut-head,
-.eq-head {
+.eq-head,
+.effect-head {
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -676,6 +680,56 @@
 }
 
 .eq-actions {
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.effect-copy {
+  margin: -4px 0 16px;
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.effect-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #080808;
+}
+
+.effect-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(160px, 1fr) 82px;
+  gap: 12px;
+  align-items: center;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.effect-row span:first-child {
+  color: var(--text2);
+}
+
+.effect-row input[type="range"] {
+  accent-color: var(--yellow);
+}
+
+.effect-row input[type="number"] {
+  height: 30px;
+  border: 1px solid #333;
+  border-radius: 3px;
+  background: #050505;
+  color: var(--yellow);
+  text-align: right;
+  font: 800 12px var(--mono);
+}
+
+.effect-actions {
   display: flex;
   justify-content: end;
   gap: 10px;
