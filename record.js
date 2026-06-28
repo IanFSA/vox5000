@@ -5,7 +5,9 @@ const $ = id => document.getElementById(id);
 const els = {
   status: $('statusText'),
   mic: $('micSelect'),
-  meter: $('meterBar'),
+  meter: $('inputMeter'),
+  meterL: $('meterBarL'),
+  meterR: $('meterBarR'),
   file: $('fileInput'),
   newBtn: $('newBtn'),
   record: $('recordBtn'),
@@ -61,6 +63,7 @@ const els = {
 let audioCtx;
 let inputStream;
 let inputAnalyser;
+let inputAnalysers = [];
 let inputGain;
 let recorder;
 let recordChunks = [];
@@ -85,6 +88,8 @@ let zoom = 1;
 let visibleStart = 0;
 let desiredChannels = 1;
 let clipboardBuffer = null;
+let recordingPeaks = [];
+let recordingWaveRafId = 0;
 
 const canvasCtx = els.canvas ? els.canvas.getContext('2d') : null;
 const overviewCtx = els.overview ? els.overview.getContext('2d') : null;
@@ -233,7 +238,19 @@ function newChannelFile(channels) {
 function setDesiredChannels(channels) {
   desiredChannels = channels;
   updateChannelScale();
+  updateMeterMode();
   setStatus(channels === 1 ? 'Recording set to mono' : 'Recording set to stereo where supported by your device');
+}
+
+function currentMeterChannels() {
+  return buffer ? Math.max(1, Math.min(2, buffer.numberOfChannels)) : Math.max(1, Math.min(2, desiredChannels));
+}
+
+function updateMeterMode() {
+  if (!els.meter) return;
+  const stereo = currentMeterChannels() > 1;
+  els.meter.classList.toggle('stereo', stereo);
+  els.meter.classList.toggle('mono', !stereo);
 }
 
 function pushUndo() {
@@ -365,6 +382,7 @@ function updateControls() {
   }
   if (els.hint) els.hint.style.display = hasAudio ? 'none' : 'block';
   updateChannelScale();
+  updateMeterMode();
   drawOverview();
 }
 
@@ -411,22 +429,107 @@ async function startInput(deviceId) {
   inputAnalyser.fftSize = 1024;
   src.connect(inputGain);
   inputGain.connect(inputAnalyser);
+  inputAnalysers = [inputAnalyser];
+  if (currentMeterChannels() > 1) {
+    const splitter = ctx.createChannelSplitter(2);
+    const leftAnalyser = ctx.createAnalyser();
+    const rightAnalyser = ctx.createAnalyser();
+    leftAnalyser.fftSize = 1024;
+    rightAnalyser.fftSize = 1024;
+    inputGain.connect(splitter);
+    splitter.connect(leftAnalyser, 0);
+    splitter.connect(rightAnalyser, 1);
+    inputAnalysers = [leftAnalyser, rightAnalyser];
+  }
+  updateMeterMode();
   drawInputMeter();
 }
 
 function drawInputMeter() {
   if (meterRafId) cancelAnimationFrame(meterRafId);
-  const data = new Uint8Array(inputAnalyser ? inputAnalyser.frequencyBinCount : 512);
+  const data = new Uint8Array(512);
   function tick() {
-    if (inputAnalyser) {
-      inputAnalyser.getByteTimeDomainData(data);
+    const analysers = inputAnalysers.length ? inputAnalysers : (inputAnalyser ? [inputAnalyser] : []);
+    const levels = analysers.map(analyser => {
+      analyser.getByteTimeDomainData(data);
       let peak = 0;
       for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i] - 128) / 128);
-      if (els.meter) els.meter.style.setProperty('--level', `${Math.min(100, Math.round(peak * 200))}%`);
-    }
+      return `${Math.min(100, Math.round(peak * 200))}%`;
+    });
+    if (els.meterL) els.meterL.style.setProperty('--level', levels[0] || '0%');
+    if (els.meterR) els.meterR.style.setProperty('--level', levels[1] || levels[0] || '0%');
     meterRafId = requestAnimationFrame(tick);
   }
   tick();
+}
+
+function drawRecordingPreview() {
+  if (!els.canvas || !canvasCtx) return;
+  const rect = els.canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  els.canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+  els.canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+  canvasCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const w = rect.width;
+  const h = rect.height;
+  canvasCtx.fillStyle = '#030303';
+  canvasCtx.fillRect(0, 0, w, h);
+
+  canvasCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  canvasCtx.lineWidth = 1;
+  for (let i = 0; i <= 12; i++) {
+    const x = (i / 12) * w;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(x, 0);
+    canvasCtx.lineTo(x, h);
+    canvasCtx.stroke();
+  }
+
+  const mid = h / 2;
+  canvasCtx.strokeStyle = 'rgba(223,255,0,0.18)';
+  canvasCtx.beginPath();
+  canvasCtx.moveTo(0, mid);
+  canvasCtx.lineTo(w, mid);
+  canvasCtx.stroke();
+
+  const visible = recordingPeaks.slice(-Math.max(1, Math.floor(w)));
+  canvasCtx.fillStyle = '#dfff00';
+  visible.forEach((peak, index) => {
+    const x = index;
+    const y1 = mid - peak.max * h * 0.42;
+    const y2 = mid - peak.min * h * 0.42;
+    canvasCtx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+  });
+
+  canvasCtx.fillStyle = '#777';
+  canvasCtx.font = '11px JetBrains Mono, monospace';
+  canvasCtx.fillText(`REC ${fmtTime((Date.now() - recordStartedAt) / 1000)}`, 8, 17);
+}
+
+function startRecordingPreview() {
+  if (recordingWaveRafId) cancelAnimationFrame(recordingWaveRafId);
+  recordingPeaks = [];
+  const data = new Float32Array(inputAnalyser ? inputAnalyser.fftSize : 1024);
+  function tick() {
+    if (!recorder || recorder.state !== 'recording' || !inputAnalyser) return;
+    inputAnalyser.getFloatTimeDomainData(data);
+    let min = 1;
+    let max = -1;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] < min) min = data[i];
+      if (data[i] > max) max = data[i];
+    }
+    recordingPeaks.push({ min, max });
+    drawRecordingPreview();
+    drawOverview();
+    recordingWaveRafId = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopRecordingPreview() {
+  if (recordingWaveRafId) cancelAnimationFrame(recordingWaveRafId);
+  recordingWaveRafId = 0;
 }
 
 async function startRecording() {
@@ -450,6 +553,7 @@ async function startRecording() {
   recorder.ondataavailable = event => { if (event.data.size) recordChunks.push(event.data); };
   recorder.onstop = async () => {
     clearInterval(timerId);
+    stopRecordingPreview();
     inputGain.disconnect(dest);
     els.record.classList.remove('active');
     els.record.innerHTML = '<span class="record-dot"></span>';
@@ -470,6 +574,7 @@ async function startRecording() {
   els.record.innerHTML = '<span class="record-dot"></span>';
   els.stop.disabled = false;
   setStatus('Recording');
+  startRecordingPreview();
   timerId = setInterval(() => {
     if (els.time) els.time.textContent = fmtTime((Date.now() - recordStartedAt) / 1000);
   }, 80);
@@ -514,6 +619,17 @@ function returnToStart() {
   drawWaveform();
   drawOverview();
   setStatus('Returned to start');
+}
+
+function selectAllAudio() {
+  if (!buffer) return;
+  selection = { start: 0, end: buffer.duration };
+  playOffset = 0;
+  visibleStart = 0;
+  updateControls();
+  drawWaveform();
+  drawOverview();
+  setStatus('Selected all audio');
 }
 
 function playPause() {
@@ -1135,10 +1251,16 @@ function toggleMenu(menu) {
   const wasOpen = menu.classList.contains('open');
   closeMenus();
   if (!wasOpen) {
-    menu.classList.add('open');
-    const button = menu.querySelector('.menu-btn');
-    if (button) button.setAttribute('aria-expanded', 'true');
+    openMenu(menu);
   }
+}
+
+function openMenu(menu) {
+  if (!menu) return;
+  closeMenus();
+  menu.classList.add('open');
+  const button = menu.querySelector('.menu-btn');
+  if (button) button.setAttribute('aria-expanded', 'true');
 }
 
 function finishWaveDrag(event) {
@@ -1193,11 +1315,45 @@ function handleEditorShortcut(event) {
     return;
   }
   if (isTypingTarget(event.target)) return;
+  const key = event.key.toLowerCase();
+  const mod = event.metaKey || event.ctrlKey;
+
+  if (mod && key === 'z') {
+    event.preventDefault();
+    event.shiftKey ? redo() : undo();
+    return;
+  }
+  if (mod && key === 'y') {
+    event.preventDefault();
+    redo();
+    return;
+  }
+  if (mod && key === 'a') {
+    event.preventDefault();
+    selectAllAudio();
+    return;
+  }
+  if ((event.key === 'Delete' || event.key === 'Backspace') && selection && selection.end > selection.start) {
+    event.preventDefault();
+    deleteSelection();
+    return;
+  }
+  if (event.key === 'Enter' && buffer) {
+    event.preventDefault();
+    returnToStart();
+    return;
+  }
+  if (event.code === 'Space' && buffer) {
+    event.preventDefault();
+    playPause();
+    return;
+  }
   const actionByShortcut = [
     ['playPause', playPause],
     ['record', startRecording],
     ['returnToStart', returnToStart],
     ['deleteSelection', deleteSelection],
+    ['selectAll', selectAllAudio],
     ['undo', undo],
     ['redo', redo],
     ['cutSplit', cutOrSplit],
@@ -1269,10 +1425,16 @@ function bindEvents() {
     });
   }
 
-  document.querySelectorAll('.menu-btn').forEach(button => {
+  document.querySelectorAll('.menu').forEach(menu => {
+    const button = menu.querySelector('.menu-btn');
+    if (!button) return;
     button.addEventListener('click', event => {
       event.stopPropagation();
-      toggleMenu(button.closest('.menu'));
+      toggleMenu(menu);
+    });
+    menu.addEventListener('mouseenter', () => {
+      const hasOpenMenu = Boolean(document.querySelector('.menu.open'));
+      if (hasOpenMenu && !menu.classList.contains('open')) openMenu(menu);
     });
   });
 

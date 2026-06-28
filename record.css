@@ -488,13 +488,35 @@
 .mini-meter {
   flex: 1;
   min-width: 72px;
-  height: 8px;
+  height: 12px;
   border: 1px solid #244;
   background: #030303;
+  display: grid;
+  gap: 2px;
+  padding: 1px;
   overflow: hidden;
 }
 
-.mini-meter div {
+.mini-meter.mono {
+  grid-template-rows: 1fr;
+}
+
+.mini-meter.stereo {
+  grid-template-rows: 1fr 1fr;
+}
+
+.meter-lane {
+  min-height: 0;
+  background: #020909;
+  overflow: hidden;
+}
+
+.mini-meter.mono .meter-lane:last-child {
+  display: none;
+}
+
+.meter-lane span {
+  display: block;
   height: 100%;
   width: var(--level, 0%);
   background: linear-gradient(to right, #6aff8f, var(--yellow), var(--red));

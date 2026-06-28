@@ -165,8 +165,9 @@
       <div class="footer-module input-module">
         <label for="micSelect">Mic</label>
         <select id="micSelect" class="compact-select"><option value="">Allow mic access</option></select>
-        <div class="mini-meter" role="meter" aria-label="Input level">
-          <div id="meterBar"></div>
+        <div class="mini-meter mono" id="inputMeter" role="meter" aria-label="Input level">
+          <div class="meter-lane" id="meterBarL"><span></span></div>
+          <div class="meter-lane" id="meterBarR"><span></span></div>
         </div>
       </div>
 
