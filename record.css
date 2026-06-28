@@ -277,7 +277,7 @@
   align-items: center;
   justify-content: stretch;
   gap: 6px;
-  padding: 6px 3px;
+  padding: calc(var(--overview-h) + 6px) 3px 6px;
   background: #080808;
   border-right: 1px solid #252525;
   box-shadow: inset -1px 0 0 rgba(223, 255, 0, 0.16);
@@ -560,7 +560,9 @@
 
 .shortcut-modal,
 .eq-modal,
-.effect-modal {
+.effect-modal,
+.settings-modal,
+.recent-modal {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -572,13 +574,17 @@
 
 .shortcut-modal[hidden],
 .eq-modal[hidden],
-.effect-modal[hidden] {
+.effect-modal[hidden],
+.settings-modal[hidden],
+.recent-modal[hidden] {
   display: none;
 }
 
 .shortcut-panel,
 .eq-panel,
-.effect-panel {
+.effect-panel,
+.settings-panel,
+.recent-panel {
   width: min(620px, 100%);
   max-height: min(760px, calc(100vh - 36px));
   overflow: auto;
@@ -591,7 +597,8 @@
 
 .shortcut-head,
 .eq-head,
-.effect-head {
+.effect-head,
+.settings-head {
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -734,6 +741,98 @@
   justify-content: end;
   gap: 10px;
   margin-top: 18px;
+}
+
+.settings-panel {
+  width: min(980px, 100%);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.settings-grid fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #080808;
+}
+
+.settings-grid legend {
+  padding: 0 6px;
+  color: var(--yellow);
+  font-weight: 900;
+}
+
+.settings-grid label {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 12px;
+  color: var(--text2);
+  font-weight: 800;
+}
+
+.settings-grid label:has(input[type="checkbox"]) {
+  display: flex;
+}
+
+.settings-grid input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--yellow);
+}
+
+.settings-grid input[type="color"] {
+  width: 70px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #050505;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.recent-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-list button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #333;
+  border-radius: 5px;
+  background: #080808;
+  color: var(--text);
+  font: 800 12px var(--font);
+  cursor: pointer;
+}
+
+.recent-list button:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.recent-list .empty {
+  color: var(--text3);
+  font-weight: 700;
 }
 
 .shortcut-list {
@@ -892,6 +991,10 @@
   }
 
   .shortcut-list label {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 }

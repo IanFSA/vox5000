@@ -25,10 +25,13 @@
         <div class="menu">
           <button class="menu-btn" aria-expanded="false" type="button">File</button>
           <div class="menu-popover">
-            <label for="fileInput">Import audio</label>
+            <label for="fileInput">Open audio file</label>
+            <label for="projectInput">Open project</label>
+            <button data-editor-action="saveProject">Save project</button>
+            <button data-editor-action="openRecent">Open recent project</button>
             <button data-editor-action="newMono">New mono file</button>
             <button data-editor-action="newStereo">New stereo file</button>
-            <button data-editor-action="export">Export file</button>
+            <button data-editor-action="export">Save audio file</button>
             <button data-editor-action="new">New session</button>
           </div>
         </div>
@@ -71,6 +74,7 @@
             <button data-editor-action="limit">Hard limiter</button>
             <button data-editor-action="noise">Noise gate</button>
             <button data-editor-action="removeSilence">Remove silence</button>
+            <button data-editor-action="reverse">Reverse audio</button>
             <button data-editor-action="showEq">3-Band EQ...</button>
           </div>
         </div>
@@ -85,6 +89,7 @@
             <button data-editor-action="waveCompact">Compact waveform</button>
             <button data-editor-action="waveNormal">Normal waveform</button>
             <button data-editor-action="waveLarge">Large waveform</button>
+            <button data-editor-action="showSettings">Recorder settings</button>
           </div>
         </div>
         <div class="menu">
@@ -99,6 +104,7 @@
     </header>
 
     <input id="fileInput" class="file-input" type="file" accept="audio/*" />
+    <input id="projectInput" class="file-input" type="file" accept=".vox5000,application/json" />
 
     <section class="editor-toolbar" aria-label="Transport and editing controls">
       <div class="time-stack">
@@ -259,9 +265,67 @@
         <p class="effect-copy" id="effectCopy"></p>
         <div class="effect-fields" id="effectFields"></div>
         <div class="effect-actions">
+          <button class="compact-btn" id="effectPreviewBtn" type="button">Preview</button>
+          <button class="compact-btn" id="effectPreviewStopBtn" type="button">Stop preview</button>
           <button class="compact-btn" id="effectCancelBtn" type="button">Cancel</button>
           <button class="compact-btn export" id="effectApplyBtn" type="button">Apply</button>
         </div>
+      </div>
+    </div>
+
+    <div class="settings-modal" id="settingsModal" hidden role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="settings-panel">
+        <div class="settings-head">
+          <div>
+            <p class="panel-kicker">Recorder</p>
+            <h2 id="settingsTitle">VOX5000 settings</h2>
+          </div>
+          <button class="square-btn" id="settingsCloseBtn" type="button" aria-label="Close settings">×</button>
+        </div>
+        <div class="settings-grid">
+          <fieldset>
+            <legend>General</legend>
+            <label><span>During playback</span><select id="settingPlaybackScroll" class="compact-select"><option value="continuous">Scroll continuously</option><option value="static">Keep playhead visible</option></select></label>
+            <label><input id="settingWheelZoom" type="checkbox" checked /> <span>Scroll wheel controls waveform zoom</span></label>
+            <label><input id="settingSnapMarkers" type="checkbox" checked /> <span>Snap cursor to nearby markers</span></label>
+          </fieldset>
+          <fieldset>
+            <legend>Colors</legend>
+            <label><span>Waveform</span><input id="settingWaveColor" type="color" value="#dfff00" /></label>
+            <label><span>View box</span><input id="settingViewColor" type="color" value="#c76bff" /></label>
+            <label><span>Background</span><input id="settingBgColor" type="color" value="#030303" /></label>
+            <label><span>Markers</span><input id="settingMarkerColor" type="color" value="#ff3b3b" /></label>
+            <label><span>Grid</span><input id="settingGridColor" type="color" value="#2a2a2a" /></label>
+          </fieldset>
+          <fieldset>
+            <legend>Document defaults</legend>
+            <label><span>MP3 bit rate</span><select id="settingBitrate" class="compact-select"><option>128</option><option>192</option><option selected>256</option><option>320</option></select></label>
+            <label><span>Sample rate</span><select id="settingSampleRate" class="compact-select"><option value="44100">44,100 Hz</option><option value="48000" selected>48,000 Hz</option></select></label>
+            <label><span>Zoom</span><select id="settingZoom" class="compact-select"><option value="fit" selected>Fit in window</option><option value="normal">Normal</option><option value="large">Large waveform</option></select></label>
+          </fieldset>
+          <fieldset>
+            <legend>Audio</legend>
+            <label><span>Input</span><select id="settingInputChannels" class="compact-select"><option value="1">Mono</option><option value="2">Stereo</option></select></label>
+            <label><input id="settingMonitor" type="checkbox" /> <span>Playthrough input to output</span></label>
+          </fieldset>
+        </div>
+        <div class="settings-actions">
+          <button class="compact-btn" id="settingsResetBtn" type="button">Reset</button>
+          <button class="compact-btn export" id="settingsSaveBtn" type="button">Save settings</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-modal" id="recentModal" hidden role="dialog" aria-modal="true" aria-labelledby="recentTitle">
+      <div class="recent-panel">
+        <div class="settings-head">
+          <div>
+            <p class="panel-kicker">File</p>
+            <h2 id="recentTitle">Recent projects</h2>
+          </div>
+          <button class="square-btn" id="recentCloseBtn" type="button" aria-label="Close recent projects">×</button>
+        </div>
+        <div class="recent-list" id="recentList"></div>
       </div>
     </div>
 

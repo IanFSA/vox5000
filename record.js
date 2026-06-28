@@ -9,6 +9,7 @@ const els = {
   meterL: $('meterBarL'),
   meterR: $('meterBarR'),
   file: $('fileInput'),
+  project: $('projectInput'),
   newBtn: $('newBtn'),
   record: $('recordBtn'),
   stop: $('stopBtn'),
@@ -65,9 +66,31 @@ const els = {
   effectTitle: $('effectTitle'),
   effectCopy: $('effectCopy'),
   effectFields: $('effectFields'),
+  effectPreview: $('effectPreviewBtn'),
+  effectPreviewStop: $('effectPreviewStopBtn'),
   effectClose: $('effectCloseBtn'),
   effectCancel: $('effectCancelBtn'),
   effectApply: $('effectApplyBtn'),
+  settingsModal: $('settingsModal'),
+  settingsClose: $('settingsCloseBtn'),
+  settingsSave: $('settingsSaveBtn'),
+  settingsReset: $('settingsResetBtn'),
+  settingPlaybackScroll: $('settingPlaybackScroll'),
+  settingWheelZoom: $('settingWheelZoom'),
+  settingSnapMarkers: $('settingSnapMarkers'),
+  settingWaveColor: $('settingWaveColor'),
+  settingViewColor: $('settingViewColor'),
+  settingBgColor: $('settingBgColor'),
+  settingMarkerColor: $('settingMarkerColor'),
+  settingGridColor: $('settingGridColor'),
+  settingBitrate: $('settingBitrate'),
+  settingSampleRate: $('settingSampleRate'),
+  settingZoom: $('settingZoom'),
+  settingInputChannels: $('settingInputChannels'),
+  settingMonitor: $('settingMonitor'),
+  recentModal: $('recentModal'),
+  recentClose: $('recentCloseBtn'),
+  recentList: $('recentList'),
 };
 
 let audioCtx;
@@ -84,12 +107,14 @@ let playStartedAt = 0;
 let playOffset = 0;
 let playEndAt = 0;
 let playSelectionActive = false;
+let previewNode;
 let rafId;
 let buffer = null;
 let fileName = 'Vox5000';
 let selection = null;
 let hoverTime = null;
 let markers = [];
+let selectedMarkerId = null;
 let dragging = false;
 let dragStart = 0;
 let dragStartX = 0;
@@ -109,6 +134,24 @@ const canvasCtx = els.canvas ? els.canvas.getContext('2d') : null;
 const overviewCtx = els.overview ? els.overview.getContext('2d') : null;
 const SHORTCUT_STORAGE_KEY = 'vox5000_editor_shortcuts_v1';
 const WAVE_SIZE_STORAGE_KEY = 'vox5000_editor_wave_size_v1';
+const SETTINGS_STORAGE_KEY = 'vox5000_editor_settings_v1';
+const RECENT_PROJECTS_KEY = 'vox5000_recent_projects_v1';
+const SNAP_SECONDS = 0.08;
+const defaultSettings = {
+  playbackScroll: 'continuous',
+  wheelZoom: true,
+  snapMarkers: true,
+  waveColor: '#dfff00',
+  viewColor: '#c76bff',
+  bgColor: '#030303',
+  markerColor: '#ff3b3b',
+  gridColor: '#2a2a2a',
+  bitrate: '256',
+  sampleRate: '48000',
+  zoom: 'fit',
+  inputChannels: '1',
+  monitor: false,
+};
 const defaultShortcuts = {
   playPause: 'Space',
   record: 'R',
@@ -124,10 +167,11 @@ const defaultShortcuts = {
   marker: 'M',
 };
 let shortcuts = loadShortcuts();
+let settings = loadSettings();
 let meterRafId = 0;
 
 function ensureAudioContext() {
-  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
+  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: Number(settings.sampleRate || 48000) });
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
@@ -151,12 +195,87 @@ function fmtTimeline(seconds) {
   return `${m}'${String(s).padStart(2, '0')}`;
 }
 
+function fmtRuler(seconds, span = 60) {
+  seconds = Math.max(0, seconds || 0);
+  if (span <= 3) return `${seconds.toFixed(2)}s`;
+  if (span <= 12) return `${seconds.toFixed(1)}s`;
+  return fmtTimeline(seconds);
+}
+
 function loadShortcuts() {
   try {
     return { ...defaultShortcuts, ...JSON.parse(localStorage.getItem(SHORTCUT_STORAGE_KEY) || '{}') };
   } catch {
     return { ...defaultShortcuts };
   }
+}
+
+function loadSettings() {
+  try {
+    return { ...defaultSettings, ...JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}') };
+  } catch {
+    return { ...defaultSettings };
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+}
+
+function applySettingsToUi() {
+  if (els.settingPlaybackScroll) els.settingPlaybackScroll.value = settings.playbackScroll;
+  if (els.settingWheelZoom) els.settingWheelZoom.checked = Boolean(settings.wheelZoom);
+  if (els.settingSnapMarkers) els.settingSnapMarkers.checked = Boolean(settings.snapMarkers);
+  if (els.settingWaveColor) els.settingWaveColor.value = settings.waveColor;
+  if (els.settingViewColor) els.settingViewColor.value = settings.viewColor;
+  if (els.settingBgColor) els.settingBgColor.value = settings.bgColor;
+  if (els.settingMarkerColor) els.settingMarkerColor.value = settings.markerColor;
+  if (els.settingGridColor) els.settingGridColor.value = settings.gridColor;
+  if (els.settingBitrate) els.settingBitrate.value = settings.bitrate;
+  if (els.settingSampleRate) els.settingSampleRate.value = settings.sampleRate;
+  if (els.settingZoom) els.settingZoom.value = settings.zoom;
+  if (els.settingInputChannels) els.settingInputChannels.value = settings.inputChannels;
+  if (els.settingMonitor) els.settingMonitor.checked = Boolean(settings.monitor);
+  desiredChannels = Number(settings.inputChannels || desiredChannels || 1);
+  if (els.exportFormat && settings.bitrate) els.exportFormat.value = `mp3:${settings.bitrate}`;
+}
+
+function readSettingsFromUi() {
+  settings = {
+    playbackScroll: els.settingPlaybackScroll ? els.settingPlaybackScroll.value : defaultSettings.playbackScroll,
+    wheelZoom: els.settingWheelZoom ? els.settingWheelZoom.checked : true,
+    snapMarkers: els.settingSnapMarkers ? els.settingSnapMarkers.checked : true,
+    waveColor: els.settingWaveColor ? els.settingWaveColor.value : defaultSettings.waveColor,
+    viewColor: els.settingViewColor ? els.settingViewColor.value : defaultSettings.viewColor,
+    bgColor: els.settingBgColor ? els.settingBgColor.value : defaultSettings.bgColor,
+    markerColor: els.settingMarkerColor ? els.settingMarkerColor.value : defaultSettings.markerColor,
+    gridColor: els.settingGridColor ? els.settingGridColor.value : defaultSettings.gridColor,
+    bitrate: els.settingBitrate ? els.settingBitrate.value : defaultSettings.bitrate,
+    sampleRate: els.settingSampleRate ? els.settingSampleRate.value : defaultSettings.sampleRate,
+    zoom: els.settingZoom ? els.settingZoom.value : defaultSettings.zoom,
+    inputChannels: els.settingInputChannels ? els.settingInputChannels.value : defaultSettings.inputChannels,
+    monitor: els.settingMonitor ? els.settingMonitor.checked : false,
+  };
+}
+
+function showSettings() {
+  applySettingsToUi();
+  if (els.settingsModal) els.settingsModal.hidden = false;
+}
+
+function closeSettings() {
+  if (els.settingsModal) els.settingsModal.hidden = true;
+}
+
+function saveSettingsFromModal() {
+  readSettingsFromUi();
+  saveSettings();
+  applySettingsToUi();
+  updateMeterMode();
+  drawWaveform();
+  drawOverview();
+  closeSettings();
+  setStatus('Recorder settings saved');
 }
 
 function saveShortcuts() {
@@ -236,6 +355,45 @@ function cloneBuffer(src) {
   return copy;
 }
 
+function cloneSelection(value) {
+  return value ? { start: value.start, end: value.end } : null;
+}
+
+function cloneMarkers(value = markers) {
+  return value.map(marker => ({ id: marker.id, time: marker.time }));
+}
+
+function captureProjectState() {
+  return {
+    buffer: buffer ? cloneBuffer(buffer) : null,
+    fileName,
+    selection: cloneSelection(selection),
+    markers: cloneMarkers(),
+    selectedMarkerId,
+    playOffset,
+    visibleStart,
+    zoom,
+    desiredChannels,
+  };
+}
+
+function restoreProjectState(state) {
+  stopPlayback();
+  buffer = state.buffer ? cloneBuffer(state.buffer) : null;
+  fileName = state.fileName || 'Vox5000';
+  selection = cloneSelection(state.selection);
+  markers = cloneMarkers(state.markers || []);
+  selectedMarkerId = state.selectedMarkerId || null;
+  playOffset = state.playOffset || 0;
+  visibleStart = state.visibleStart || 0;
+  zoom = state.zoom || 1;
+  desiredChannels = state.desiredChannels || (buffer && buffer.numberOfChannels > 1 ? 2 : 1);
+  hoverTime = null;
+  updateControls();
+  drawWaveform();
+  drawOverview();
+}
+
 function createBlankBuffer(channels) {
   const ctx = ensureAudioContext();
   return ctx.createBuffer(channels, ctx.sampleRate, ctx.sampleRate);
@@ -270,8 +428,7 @@ function updateMeterMode() {
 }
 
 function pushUndo() {
-  if (!buffer) return;
-  undoStack.push(cloneBuffer(buffer));
+  undoStack.push(captureProjectState());
   if (undoStack.length > 30) undoStack.shift();
   redoStack = [];
   updateControls();
@@ -361,6 +518,7 @@ function setBuffer(next, name) {
   selection = null;
   hoverTime = null;
   markers = [];
+  selectedMarkerId = null;
   playOffset = 0;
   playEndAt = 0;
   playSelectionActive = false;
@@ -495,10 +653,11 @@ function drawRecordingPreview() {
   canvasCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
   const w = rect.width;
   const h = rect.height;
-  canvasCtx.fillStyle = '#030303';
+  canvasCtx.fillStyle = settings.bgColor || '#030303';
   canvasCtx.fillRect(0, 0, w, h);
 
-  canvasCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  canvasCtx.strokeStyle = settings.gridColor || 'rgba(255,255,255,0.08)';
+  canvasCtx.globalAlpha = 0.35;
   canvasCtx.lineWidth = 1;
   for (let i = 0; i <= 12; i++) {
     const x = (i / 12) * w;
@@ -507,6 +666,7 @@ function drawRecordingPreview() {
     canvasCtx.lineTo(x, h);
     canvasCtx.stroke();
   }
+  canvasCtx.globalAlpha = 1;
 
   const mid = h / 2;
   canvasCtx.strokeStyle = 'rgba(223,255,0,0.18)';
@@ -628,6 +788,136 @@ async function importFile(file) {
   setStatus('Imported audio');
 }
 
+async function blobToDataUrl(blob) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToArrayBuffer(dataUrl) {
+  const base64 = String(dataUrl).split(',')[1] || '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function buildProjectPayload() {
+  if (!buffer) return null;
+  const wavBlob = encodeWav(buffer);
+  return {
+    version: 1,
+    app: 'VOX5000',
+    savedAt: new Date().toISOString(),
+    fileName,
+    audio: await blobToDataUrl(wavBlob),
+    markers: cloneMarkers(),
+    selection: cloneSelection(selection),
+    playOffset,
+    visibleStart,
+    zoom,
+    desiredChannels,
+    settings,
+  };
+}
+
+async function saveProject() {
+  if (!buffer) return;
+  setStatus('Saving project');
+  const payload = await buildProjectPayload();
+  const json = JSON.stringify(payload);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName || 'Vox5000'}.vox5000`;
+  a.click();
+  URL.revokeObjectURL(url);
+  cacheRecentProject(payload, json);
+  setStatus('Project saved');
+}
+
+function cacheRecentProject(payload, json) {
+  if (json.length > 3500000) return;
+  const recent = loadRecentProjects().filter(item => item.name !== payload.fileName);
+  recent.unshift({ name: payload.fileName, savedAt: payload.savedAt, json });
+  localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(recent.slice(0, 5)));
+}
+
+function loadRecentProjects() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_PROJECTS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+async function openProjectFile(file) {
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    await loadProjectPayload(payload);
+    setStatus('Project opened');
+  } catch (err) {
+    setStatus('Could not open project file');
+  }
+}
+
+async function loadProjectPayload(payload) {
+  const ctx = ensureAudioContext();
+  const decoded = await ctx.decodeAudioData(dataUrlToArrayBuffer(payload.audio));
+  buffer = decoded;
+  fileName = payload.fileName || 'Vox5000_project';
+  selection = cloneSelection(payload.selection);
+  markers = cloneMarkers(payload.markers || []);
+  selectedMarkerId = null;
+  playOffset = payload.playOffset || 0;
+  visibleStart = payload.visibleStart || 0;
+  zoom = payload.zoom || 1;
+  desiredChannels = payload.desiredChannels || (decoded.numberOfChannels > 1 ? 2 : 1);
+  if (payload.settings) {
+    settings = { ...defaultSettings, ...payload.settings };
+    saveSettings();
+    applySettingsToUi();
+  }
+  undoStack = [];
+  redoStack = [];
+  updateControls();
+  drawWaveform();
+  drawOverview();
+}
+
+function showRecentProjects() {
+  if (!els.recentModal || !els.recentList) return;
+  const recent = loadRecentProjects();
+  els.recentList.innerHTML = '';
+  if (!recent.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No recent projects cached in this browser yet.';
+    els.recentList.appendChild(empty);
+  }
+  recent.forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.innerHTML = `<span>${item.name}</span><small>${new Date(item.savedAt).toLocaleString()}</small>`;
+    button.addEventListener('click', async () => {
+      await loadProjectPayload(JSON.parse(item.json));
+      closeRecentProjects();
+      setStatus('Recent project opened');
+    });
+    els.recentList.appendChild(button);
+  });
+  els.recentModal.hidden = false;
+}
+
+function closeRecentProjects() {
+  if (els.recentModal) els.recentModal.hidden = true;
+}
+
 function stopPlayback() {
   if (sourceNode) {
     try { sourceNode.stop(); } catch {}
@@ -743,14 +1033,24 @@ function trimSelection() {
   const range = selectionSamples();
   if (!range) return;
   pushUndo();
+  const keptMarkers = markers
+    .filter(marker => marker.time >= selection.start && marker.time <= selection.end)
+    .map(marker => ({ ...marker, time: marker.time - selection.start }));
   setBuffer(copyRange(buffer, range.start, range.end), fileName);
+  markers = keptMarkers;
   setStatus('Trimmed to selection');
+  drawWaveform();
+  drawOverview();
 }
 
 function deleteSelection() {
   const range = selectionSamples();
   if (!range) return;
   pushUndo();
+  const deletedDuration = selection.end - selection.start;
+  const keptMarkers = markers
+    .filter(marker => marker.time < selection.start || marker.time > selection.end)
+    .map(marker => marker.time > selection.end ? { ...marker, time: marker.time - deletedDuration } : marker);
   const ctx = ensureAudioContext();
   const len = Math.max(1, buffer.length - (range.end - range.start));
   const out = ctx.createBuffer(buffer.numberOfChannels, len, buffer.sampleRate);
@@ -761,7 +1061,11 @@ function deleteSelection() {
     dst.set(src.slice(range.end), range.start);
   }
   setBuffer(out, fileName);
+  markers = keptMarkers;
+  selectedMarkerId = null;
   setStatus('Deleted selection');
+  drawWaveform();
+  drawOverview();
 }
 
 function copySelection() {
@@ -780,6 +1084,9 @@ function pasteClipboard() {
     return;
   }
   pushUndo();
+  const insertSeconds = playOffset;
+  const clipDuration = clipboardBuffer.duration;
+  const keptMarkers = markers.map(marker => marker.time >= insertSeconds ? { ...marker, time: marker.time + clipDuration } : marker);
   const ctx = ensureAudioContext();
   const insertAt = secondsToSamples(playOffset);
   const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + clipboardBuffer.length, buffer.sampleRate);
@@ -792,6 +1099,7 @@ function pasteClipboard() {
     dst.set(src.slice(insertAt), insertAt + clipboardBuffer.length);
   }
   setBuffer(out, fileName);
+  markers = keptMarkers;
   playOffset = samplesToSeconds(insertAt + clipboardBuffer.length);
   setStatus('Pasted audio');
 }
@@ -817,8 +1125,11 @@ function splitAtPlayhead() {
 
 function addMarker() {
   if (!buffer) return;
+  pushUndo();
   const time = Math.max(0, Math.min(buffer.duration, currentPlayhead()));
-  markers.push({ id: Date.now(), time });
+  const id = Date.now();
+  markers.push({ id, time });
+  selectedMarkerId = id;
   markers.sort((a, b) => a.time - b.time);
   drawWaveform();
   drawOverview();
@@ -851,6 +1162,7 @@ function clampSample(value) {
 
 function openEffectDialog(config) {
   if (!els.effectModal || !els.effectFields || !els.effectApply) return;
+  stopEffectPreview();
   if (els.effectKicker) els.effectKicker.textContent = config.kicker || 'Audio';
   if (els.effectTitle) els.effectTitle.textContent = config.title || 'Audio effect';
   if (els.effectCopy) els.effectCopy.textContent = config.copy || '';
@@ -881,19 +1193,68 @@ function openEffectDialog(config) {
     };
     slider.addEventListener('input', () => sync(slider.value));
     number.addEventListener('input', () => sync(number.value));
+    slider.addEventListener('dblclick', event => {
+      event.preventDefault();
+      sync(field.value);
+    });
+    number.addEventListener('dblclick', event => {
+      event.preventDefault();
+      sync(field.value);
+    });
     row.append(name, slider, number);
     els.effectFields.appendChild(row);
   });
   els.effectApply.onclick = () => {
+    stopEffectPreview();
     config.apply(values);
     closeEffectDialog();
   };
+  if (els.effectPreview) {
+    els.effectPreview.onclick = () => {
+      if (config.preview) config.preview(values);
+      else setStatus('Preview is not available for this effect');
+    };
+  }
+  if (els.effectPreviewStop) els.effectPreviewStop.onclick = stopEffectPreview;
   els.effectModal.hidden = false;
 }
 
 function closeEffectDialog() {
+  stopEffectPreview();
   if (els.effectModal) els.effectModal.hidden = true;
   if (els.effectApply) els.effectApply.onclick = null;
+  if (els.effectPreview) els.effectPreview.onclick = null;
+  if (els.effectPreviewStop) els.effectPreviewStop.onclick = null;
+}
+
+function stopEffectPreview() {
+  if (!previewNode) return;
+  try { previewNode.stop(); } catch {}
+  try { previewNode.disconnect(); } catch {}
+  previewNode = null;
+}
+
+function previewProcessedBuffer(makeBuffer) {
+  if (!buffer) return;
+  stopEffectPreview();
+  const ctx = ensureAudioContext();
+  const previewBuffer = makeBuffer();
+  previewNode = ctx.createBufferSource();
+  previewNode.buffer = previewBuffer;
+  previewNode.connect(ctx.destination);
+  const range = selection && selection.end > selection.start ? selection : { start: 0, end: previewBuffer.duration };
+  previewNode.start(0, range.start, Math.max(0.01, range.end - range.start));
+  previewNode.onended = () => { previewNode = null; };
+  setStatus('Previewing effect');
+}
+
+function processedClone(fn) {
+  const out = cloneBuffer(buffer);
+  const range = selectionSamples() || { start: 0, end: out.length };
+  for (let ch = 0; ch < out.numberOfChannels; ch++) {
+    fn(out.getChannelData(ch), range.start, range.end, out.sampleRate, ch);
+  }
+  return out;
 }
 
 function fadeIn() {
@@ -910,6 +1271,21 @@ function fadeOut() {
   });
 }
 
+function reverseAudio() {
+  if (!buffer) return;
+  processSamples(selection && selection.end > selection.start ? 'Selection reversed' : 'Audio reversed', (data, start, end) => {
+    let left = start;
+    let right = end - 1;
+    while (left < right) {
+      const tmp = data[left];
+      data[left] = data[right];
+      data[right] = tmp;
+      left += 1;
+      right -= 1;
+    }
+  });
+}
+
 function normalize() {
   if (!buffer) return;
   openEffectDialog({
@@ -918,6 +1294,18 @@ function normalize() {
     copy: 'Set the loudest point of the selection, or the whole file, to a target peak level.',
     fields: [{ name: 'targetDb', label: 'Target peak dB', min: -24, max: 0, step: 0.5, value: -1 }],
     apply: values => applyNormalize(values.targetDb),
+    preview: values => previewProcessedBuffer(() => {
+      const range = selectionSamples() || { start: 0, end: buffer.length };
+      let peak = 0;
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = range.start; i < range.end; i++) peak = Math.max(peak, Math.abs(data[i]));
+      }
+      const gain = peak ? dbToGain(values.targetDb) / peak : 1;
+      return processedClone((data, start, end) => {
+        for (let i = start; i < end; i++) data[i] = clampSample(data[i] * gain);
+      });
+    }),
   });
 }
 
@@ -952,6 +1340,12 @@ function amplifyVolume() {
         for (let i = start; i < end; i++) data[i] = clampSample(data[i] * gain);
       });
     },
+    preview: values => previewProcessedBuffer(() => {
+      const gain = dbToGain(values.gainDb);
+      return processedClone((data, start, end) => {
+        for (let i = start; i < end; i++) data[i] = clampSample(data[i] * gain);
+      });
+    }),
   });
 }
 
@@ -969,30 +1363,33 @@ function compressVoice() {
       { name: 'makeupDb', label: 'Post gain dB', min: -12, max: 24, step: 0.5, value: 2 },
     ],
     apply: values => applyCompressor(values),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => compressData(data, start, end, values))),
   });
 }
 
-function applyCompressor(values) {
+function compressData(data, start, end, values) {
   const threshold = dbToGain(values.thresholdDb);
   const ratio = Math.max(1, Number(values.ratio || 1));
   const makeup = dbToGain(values.makeupDb);
-  processSamples('Compressor applied', (data, start, end) => {
-    let envelope = 0;
-    const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
-    const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
-    for (let i = start; i < end; i++) {
-      const abs = Math.abs(data[i]);
-      envelope = abs > envelope
-        ? attack * envelope + (1 - attack) * abs
-        : release * envelope + (1 - release) * abs;
-      let gain = 1;
-      if (envelope > threshold) {
-        const compressed = threshold + (envelope - threshold) / ratio;
-        gain = compressed / Math.max(envelope, 0.000001);
-      }
-      data[i] = clampSample(data[i] * gain * makeup);
+  let envelope = 0;
+  const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
+  const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
+  for (let i = start; i < end; i++) {
+    const abs = Math.abs(data[i]);
+    envelope = abs > envelope
+      ? attack * envelope + (1 - attack) * abs
+      : release * envelope + (1 - release) * abs;
+    let gain = 1;
+    if (envelope > threshold) {
+      const compressed = threshold + (envelope - threshold) / ratio;
+      gain = compressed / Math.max(envelope, 0.000001);
     }
-  });
+    data[i] = clampSample(data[i] * gain * makeup);
+  }
+}
+
+function applyCompressor(values) {
+  processSamples('Compressor applied', (data, start, end) => compressData(data, start, end, values));
 }
 
 function limiter() {
@@ -1002,17 +1399,31 @@ function limiter() {
     title: 'Hard limiter',
     copy: 'Set a ceiling for peaks. Drive adds level before the limiter catches the loudest parts.',
     fields: [
-      { name: 'ceilingDb', label: 'Ceiling dB', min: -24, max: 0, step: 0.5, value: -1 },
-      { name: 'driveDb', label: 'Drive dB', min: 0, max: 24, step: 0.5, value: 0 },
+      { name: 'ceilingDb', label: 'Ceiling dB', min: -24, max: -0.1, step: 0.1, value: -1 },
+      { name: 'driveDb', label: 'Drive dB', min: 0, max: 12, step: 0.5, value: 0 },
+      { name: 'softness', label: 'Softness', min: 0, max: 1, step: 0.05, value: 0.35 },
     ],
-    apply: values => {
-      const ceiling = dbToGain(values.ceilingDb);
-      const drive = dbToGain(values.driveDb);
-      processSamples('Limiter applied', (data, start, end) => {
-        for (let i = start; i < end; i++) data[i] = Math.max(-ceiling, Math.min(ceiling, data[i] * drive));
-      });
-    },
+    apply: values => processSamples('Limiter applied', (data, start, end) => limitData(data, start, end, values)),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => limitData(data, start, end, values))),
   });
+}
+
+function limitData(data, start, end, values) {
+  const ceiling = dbToGain(values.ceilingDb);
+  const drive = dbToGain(values.driveDb);
+  const softness = Math.max(0, Math.min(1, Number(values.softness || 0)));
+  for (let i = start; i < end; i++) {
+    const driven = data[i] * drive;
+    const sign = Math.sign(driven);
+    const abs = Math.abs(driven);
+    if (abs <= ceiling) {
+      data[i] = driven;
+    } else {
+      const over = abs - ceiling;
+      const softened = ceiling + (over / (1 + over * (12 + softness * 36)));
+      data[i] = clampSample(sign * Math.min(0.999, softened));
+    }
+  }
 }
 
 function noiseGate() {
@@ -1022,17 +1433,29 @@ function noiseGate() {
     title: 'Noise gate',
     copy: 'Reduce low-level room noise between words. Use a lower threshold if it cuts off speech.',
     fields: [
-      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -45 },
-      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -45 },
+      { name: 'thresholdDb', label: 'Threshold dB', min: -80, max: -5, step: 1, value: -42 },
+      { name: 'reductionDb', label: 'Reduction dB', min: -80, max: 0, step: 1, value: -60 },
+      { name: 'attackMs', label: 'Attack ms', min: 0, max: 100, step: 1, value: 5 },
+      { name: 'releaseMs', label: 'Release ms', min: 20, max: 1000, step: 10, value: 160 },
     ],
-    apply: values => {
-      const threshold = dbToGain(values.thresholdDb);
-      const reduction = dbToGain(values.reductionDb);
-      processSamples('Noise gate applied', (data, start, end) => {
-        for (let i = start; i < end; i++) if (Math.abs(data[i]) < threshold) data[i] *= reduction;
-      });
-    },
+    apply: values => processSamples('Noise gate applied', (data, start, end) => gateData(data, start, end, values)),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => gateData(data, start, end, values))),
   });
+}
+
+function gateData(data, start, end, values) {
+  const threshold = dbToGain(values.thresholdDb);
+  const reduction = dbToGain(values.reductionDb);
+  const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
+  const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
+  let gain = 1;
+  for (let i = start; i < end; i++) {
+    const target = Math.abs(data[i]) >= threshold ? 1 : reduction;
+    gain = target > gain
+      ? attack * gain + (1 - attack) * target
+      : release * gain + (1 - release) * target;
+    data[i] *= gain;
+  }
 }
 
 function removeSilence() {
@@ -1142,6 +1565,7 @@ function applyInsertSilence(duration) {
 async function applyEq() {
   if (!buffer) return;
   pushUndo();
+  const keptMarkers = cloneMarkers();
   const ctx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
@@ -1161,6 +1585,7 @@ async function applyEq() {
   src.connect(low).connect(mid).connect(high).connect(ctx.destination);
   src.start();
   setBuffer(await ctx.startRendering(), fileName);
+  markers = keptMarkers;
   setStatus('EQ applied');
   closeEq();
 }
@@ -1201,22 +1626,77 @@ function applyEqPreset() {
 
 function undo() {
   if (!undoStack.length) return;
-  redoStack.push(cloneBuffer(buffer));
-  setBuffer(undoStack.pop(), fileName);
+  redoStack.push(captureProjectState());
+  restoreProjectState(undoStack.pop());
   setStatus('Undo');
 }
 
 function redo() {
   if (!redoStack.length) return;
-  undoStack.push(cloneBuffer(buffer));
-  setBuffer(redoStack.pop(), fileName);
+  undoStack.push(captureProjectState());
+  restoreProjectState(redoStack.pop());
   setStatus('Redo');
 }
 
 function canvasPointToSeconds(event) {
   const rect = els.canvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+  const seconds = buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
+  return snapTimeToMarker(seconds);
+}
+
+function rawCanvasPointToSeconds(event) {
+  const rect = els.canvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
   return buffer ? Math.min(buffer.duration, visibleStart + (x / rect.width) * visibleDuration()) : 0;
+}
+
+function snapTimeToMarker(seconds) {
+  if (!settings.snapMarkers || !markers.length) return seconds;
+  const nearest = markers.reduce((best, marker) => {
+    const distance = Math.abs(marker.time - seconds);
+    return !best || distance < best.distance ? { marker, distance } : best;
+  }, null);
+  return nearest && nearest.distance <= SNAP_SECONDS ? nearest.marker.time : seconds;
+}
+
+function markerAtEvent(event) {
+  if (!buffer || !markers.length) return null;
+  const seconds = rawCanvasPointToSeconds(event);
+  const snap = Math.max(SNAP_SECONDS, visibleDuration() * 0.008);
+  return markers.find(marker => Math.abs(marker.time - seconds) <= snap) || null;
+}
+
+function deleteSelectedMarker() {
+  if (!selectedMarkerId) return false;
+  pushUndo();
+  markers = markers.filter(marker => marker.id !== selectedMarkerId);
+  selectedMarkerId = null;
+  drawWaveform();
+  drawOverview();
+  updateControls();
+  setStatus('Marker deleted');
+  return true;
+}
+
+function selectBetweenMarkers(point) {
+  if (!buffer || markers.length < 2) return false;
+  const sorted = markers.slice().sort((a, b) => a.time - b.time);
+  let left = null;
+  let right = null;
+  sorted.forEach(marker => {
+    if (marker.time < point) left = marker;
+    if (!right && marker.time > point) right = marker;
+  });
+  if (!left || !right) return false;
+  selection = { start: left.time, end: right.time };
+  selectedMarkerId = null;
+  playOffset = selection.start;
+  updateControls();
+  drawWaveform();
+  drawOverview();
+  setStatus('Selected audio between markers');
+  return true;
 }
 
 function drawWaveform() {
@@ -1264,7 +1744,7 @@ function drawWaveform() {
     canvasCtx.lineTo(w, mid);
     canvasCtx.stroke();
 
-    canvasCtx.fillStyle = '#dfff00';
+    canvasCtx.fillStyle = settings.waveColor || '#dfff00';
     for (let x = 0; x < w; x++) {
       const start = sampleStart + Math.floor(x * step);
       let min = 1;
@@ -1290,20 +1770,21 @@ function drawWaveform() {
     const right = Math.max(0, Math.min(w, x2));
     canvasCtx.fillStyle = 'rgba(111,75,150,0.52)';
     canvasCtx.fillRect(left, 0, Math.max(0, right - left), h);
-    canvasCtx.strokeStyle = '#dfff00';
+    canvasCtx.strokeStyle = settings.waveColor || '#dfff00';
     canvasCtx.strokeRect(left, 0, Math.max(0, right - left), h);
   }
 
   markers.forEach((marker, index) => {
     if (marker.time < visibleStart || marker.time > visibleStart + viewDuration) return;
     const x = ((marker.time - visibleStart) / viewDuration) * w;
-    canvasCtx.strokeStyle = '#dfff00';
-    canvasCtx.lineWidth = 2;
+    const selected = marker.id === selectedMarkerId;
+    canvasCtx.strokeStyle = selected ? (settings.waveColor || '#dfff00') : (settings.markerColor || '#ff3b3b');
+    canvasCtx.lineWidth = selected ? 3 : 2;
     canvasCtx.beginPath();
     canvasCtx.moveTo(x, 0);
     canvasCtx.lineTo(x, h);
     canvasCtx.stroke();
-    canvasCtx.fillStyle = '#dfff00';
+    canvasCtx.fillStyle = selected ? (settings.waveColor || '#dfff00') : (settings.markerColor || '#ff3b3b');
     canvasCtx.beginPath();
     canvasCtx.moveTo(x - 5, 0);
     canvasCtx.lineTo(x + 5, 0);
@@ -1316,7 +1797,7 @@ function drawWaveform() {
 
   const playX = ((currentPlayhead() - visibleStart) / viewDuration) * w;
   if (playX >= 0 && playX <= w) {
-    canvasCtx.strokeStyle = '#ff3b3b';
+    canvasCtx.strokeStyle = settings.markerColor || '#ff3b3b';
     canvasCtx.lineWidth = 2;
     canvasCtx.beginPath();
     canvasCtx.moveTo(playX, 0);
@@ -1328,7 +1809,7 @@ function drawWaveform() {
   canvasCtx.font = '11px JetBrains Mono, monospace';
   for (let i = 0; i <= 10; i++) {
     const seconds = visibleStart + (i / 10) * viewDuration;
-    canvasCtx.fillText(fmtTimeline(seconds), (i / 10) * w + 3, 15);
+    canvasCtx.fillText(fmtRuler(seconds, viewDuration), (i / 10) * w + 3, 15);
   }
 }
 
@@ -1367,7 +1848,7 @@ function drawOverview() {
   const waveHeight = Math.max(8, h - rulerHeight - 7);
   const mid = top + waveHeight / 2;
   const step = Math.max(1, Math.floor(data.length / Math.max(1, w)));
-  overviewCtx.fillStyle = '#dfff00';
+  overviewCtx.fillStyle = settings.waveColor || '#dfff00';
   for (let x = 0; x < w; x++) {
     const start = Math.floor(x * step);
     let min = 1;
@@ -1390,21 +1871,21 @@ function drawOverview() {
     overviewCtx.moveTo(x, rulerTop);
     overviewCtx.lineTo(x, h);
     overviewCtx.stroke();
-    overviewCtx.fillText(fmtTimeline(seconds), x + 4, h - 5);
+    overviewCtx.fillText(fmtRuler(seconds, buffer.duration), x + 4, h - 5);
   }
 
   const viewDuration = visibleDuration();
   const x1 = (visibleStart / buffer.duration) * w;
   const x2 = ((visibleStart + viewDuration) / buffer.duration) * w;
-  overviewCtx.fillStyle = 'rgba(214, 105, 255, 0.18)';
+  overviewCtx.fillStyle = `${settings.viewColor || '#c76bff'}33`;
   overviewCtx.fillRect(x1, top, Math.max(3, x2 - x1), waveHeight);
-  overviewCtx.strokeStyle = '#c76bff';
+  overviewCtx.strokeStyle = settings.viewColor || '#c76bff';
   overviewCtx.lineWidth = 2;
   overviewCtx.strokeRect(x1, top + 1, Math.max(3, x2 - x1), Math.max(3, waveHeight - 2));
 
   markers.forEach(marker => {
     const x = (marker.time / buffer.duration) * w;
-    overviewCtx.strokeStyle = '#dfff00';
+    overviewCtx.strokeStyle = marker.id === selectedMarkerId ? (settings.waveColor || '#dfff00') : (settings.markerColor || '#ff3b3b');
     overviewCtx.lineWidth = 1;
     overviewCtx.beginPath();
     overviewCtx.moveTo(x, top);
@@ -1413,7 +1894,7 @@ function drawOverview() {
   });
 
   const playX = (currentPlayhead() / buffer.duration) * w;
-  overviewCtx.strokeStyle = '#dfff00';
+  overviewCtx.strokeStyle = settings.waveColor || '#dfff00';
   overviewCtx.lineWidth = 2;
   overviewCtx.beginPath();
   overviewCtx.moveTo(playX, 0);
@@ -1614,6 +2095,8 @@ function handleEditorShortcut(event) {
     closeShortcuts();
     closeEq();
     closeEffectDialog();
+    closeSettings();
+    closeRecentProjects();
     finishWaveDrag(event);
     return;
   }
@@ -1641,6 +2124,11 @@ function handleEditorShortcut(event) {
   if (mod && key === 'a') {
     event.preventDefault();
     selectAllAudio();
+    return;
+  }
+  if ((event.key === 'Delete' || event.key === 'Backspace') && selectedMarkerId) {
+    event.preventDefault();
+    deleteSelectedMarker();
     return;
   }
   if ((event.key === 'Delete' || event.key === 'Backspace') && selection && selection.end > selection.start) {
@@ -1680,6 +2168,7 @@ function handleEditorShortcut(event) {
 function bindEvents() {
   if (els.mic) els.mic.addEventListener('change', () => startInput(els.mic.value));
   if (els.file) els.file.addEventListener('change', () => importFile(els.file.files[0]));
+  if (els.project) els.project.addEventListener('change', () => openProjectFile(els.project.files[0]));
   if (els.newBtn) els.newBtn.addEventListener('click', newSession);
   if (els.record) els.record.addEventListener('click', startRecording);
   if (els.stop) els.stop.addEventListener('click', stopTransport);
@@ -1702,10 +2191,26 @@ function bindEvents() {
   if (els.eqClose) els.eqClose.addEventListener('click', closeEq);
   if (els.effectClose) els.effectClose.addEventListener('click', closeEffectDialog);
   if (els.effectCancel) els.effectCancel.addEventListener('click', closeEffectDialog);
+  if (els.settingsClose) els.settingsClose.addEventListener('click', closeSettings);
+  if (els.settingsSave) els.settingsSave.addEventListener('click', saveSettingsFromModal);
+  if (els.settingsReset) els.settingsReset.addEventListener('click', () => {
+    settings = { ...defaultSettings };
+    saveSettings();
+    applySettingsToUi();
+    drawWaveform();
+    drawOverview();
+    setStatus('Recorder settings reset');
+  });
+  if (els.recentClose) els.recentClose.addEventListener('click', closeRecentProjects);
   if (els.eqReset) els.eqReset.addEventListener('click', () => setEqValues(0, 0, 0));
   if (els.eqPreset) els.eqPreset.addEventListener('change', applyEqPreset);
   [els.lowEq, els.midEq, els.highEq].forEach(slider => {
     if (slider) slider.addEventListener('input', updateEqValues);
+    if (slider) slider.addEventListener('dblclick', event => {
+      event.preventDefault();
+      slider.value = 0;
+      updateEqValues();
+    });
   });
   if (els.undo) els.undo.addEventListener('click', undo);
   if (els.redo) els.redo.addEventListener('click', redo);
@@ -1753,6 +2258,17 @@ function bindEvents() {
     els.canvas.addEventListener('pointerdown', event => {
       if (!buffer) return;
       event.preventDefault();
+      const hitMarker = markerAtEvent(event);
+      if (hitMarker) {
+        selectedMarkerId = hitMarker.id;
+        selection = null;
+        playOffset = hitMarker.time;
+        updateControls();
+        drawWaveform();
+        drawOverview();
+        return;
+      }
+      selectedMarkerId = null;
       dragging = true;
       dragStart = canvasPointToSeconds(event);
       dragStartX = event.clientX;
@@ -1777,6 +2293,11 @@ function bindEvents() {
       drawOverview();
     });
     els.canvas.addEventListener('pointerup', handleWavePointerUp);
+    els.canvas.addEventListener('dblclick', event => {
+      if (!buffer) return;
+      event.preventDefault();
+      selectBetweenMarkers(rawCanvasPointToSeconds(event));
+    });
     els.canvas.addEventListener('pointerleave', () => {
       hoverTime = null;
       updateControls();
@@ -1823,6 +2344,8 @@ function bindEvents() {
     closeMenus();
     const actions = {
       export: exportFile,
+      saveProject,
+      openRecent: showRecentProjects,
       new: newSession,
       newMono: () => newChannelFile(1),
       newStereo: () => newChannelFile(2),
@@ -1837,6 +2360,7 @@ function bindEvents() {
       normalize,
       fadeIn,
       fadeOut,
+      reverse: reverseAudio,
       compress: compressVoice,
       limit: limiter,
       noise: noiseGate,
@@ -1856,6 +2380,7 @@ function bindEvents() {
       waveNormal: () => setWaveSize('normal'),
       waveLarge: () => setWaveSize('large'),
       showShortcuts,
+      showSettings,
     };
     if (actions[action]) actions[action]();
   });
@@ -1880,6 +2405,7 @@ function bindEvents() {
 }
 
 bindEvents();
+applySettingsToUi();
 initMics();
 normalizeShortcutDefaults();
 restoreWaveSize();
