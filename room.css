@@ -841,3 +841,9 @@
   .settings-panel { width: calc(100vw - 32px); right: 16px; }
   .guest-controls-row { flex-direction: column; }
 }
+
+
+/* V50: room health states — honest connection status */
+.room-health.health-online { color: var(--green, #00e56b); }
+.room-health.health-warn { color: var(--yellow, #dfff00); }
+.room-health.health-offline { color: var(--red, #ff3b3b); }

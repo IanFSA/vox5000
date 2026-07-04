@@ -791,12 +791,17 @@ async function importFile(file) {
   if (!file) return;
   const ctx = ensureAudioContext();
   setStatus('Decoding import');
-  const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
-  if (buffer) pushUndo();
-  setBuffer(decoded, file.name.replace(/\.[^.]+$/, '') || 'Vox5000_import');
+  try {
+    const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
+    if (buffer) pushUndo();
+    setBuffer(decoded, file.name.replace(/\.[^.]+$/, '') || 'Vox5000_import');
+    focusEditor();
+    setStatus('Imported audio');
+  } catch (err) {
+    console.warn('Import decode failed:', err);
+    setStatus('Could not read that file — it may be corrupt or an unsupported format');
+  }
   if (els.file) els.file.value = '';
-  focusEditor();
-  setStatus('Imported audio');
 }
 
 async function blobToDataUrl(blob) {
@@ -1534,17 +1539,19 @@ function compressVoice() {
       { name: 'makeupDb', label: 'Post gain dB', min: -12, max: 24, step: 0.5, value: 0 },
     ],
     apply: values => applyCompressor(values),
-    preview: values => previewProcessedBuffer(() => processedClone((data, start, end) => compressData(data, start, end, values))),
+    preview: values => previewProcessedBuffer(() => processedClone((data, start, end, sampleRate) => compressData(data, start, end, values, sampleRate))),
   });
 }
 
-function compressData(data, start, end, values) {
+function compressData(data, start, end, values, sampleRate) {
   const threshold = dbToGain(values.thresholdDb);
   const ratio = Math.max(1, Number(values.ratio || 1));
   const makeup = dbToGain(values.makeupDb);
   let envelope = 0;
-  const attack = Math.exp(-1 / Math.max(1, values.attackMs * 48));
-  const release = Math.exp(-1 / Math.max(1, values.releaseMs * 48));
+  // V50: use the file's real sample rate — was hardcoded to 48 kHz
+  const samplesPerMs = (sampleRate || 48000) / 1000;
+  const attack = Math.exp(-1 / Math.max(1, values.attackMs * samplesPerMs));
+  const release = Math.exp(-1 / Math.max(1, values.releaseMs * samplesPerMs));
   for (let i = start; i < end; i++) {
     const abs = Math.abs(data[i]);
     envelope = abs > envelope
@@ -1560,7 +1567,7 @@ function compressData(data, start, end, values) {
 }
 
 function applyCompressor(values) {
-  processSamples('Compressor applied', (data, start, end) => compressData(data, start, end, values));
+  processSamples('Compressor applied', (data, start, end, sampleRate) => compressData(data, start, end, values, sampleRate));
 }
 
 function insertSilence() {

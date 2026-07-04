@@ -502,7 +502,10 @@
   </div>
 
   <div id="audioElements" style="display:none;" aria-hidden="true"></div>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="config.js"></script>
+  <!-- V50: PeerJS is self-hosted so a CDN outage cannot kill interview rooms; unpkg is the fallback -->
+  <script src="peerjs.min.js"></script>
+  <script>if (typeof Peer === 'undefined') { document.write('<scr' + 'ipt src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/scr' + 'ipt>'); }</script>
   <script src="room.js"></script>
 </body>
 </html>

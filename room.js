@@ -116,6 +116,10 @@ let currentMicId;
 let hostSelfMuted = false;
 const consentLog = [];
 let hostReturning = false;
+let hostRoomShown = false; // V50: prevents audio-graph rebuild when signalling reconnects
+let recordingStartedEpoch = 0; // V50: sync metadata — host clock at record start
+let localRecordStartedEpoch = 0; // V50: this participant's actual recorder start time
+let expectedTransferCount = 0; // V50: snapshot of guests owing a track at stop time
 let settingsPanelBound = false;
 let guestConnectAttempt = 0;
 let guestConnectTimer = null;
@@ -211,6 +215,8 @@ function checkHostReturn() {
     myName = s.name;
     myConsented = true;
     hostReturning = true;
+    // V50 (audit A13): returning hosts were missing from the consent log
+    consentLog.push(buildParticipantLogEntry(myName, 'Host', true, false));
     return true;
   }
   return false;
@@ -419,13 +425,68 @@ function restartGuestPeer() {
   initPeer(`GUEST-${roomId}-${randId(4)}`);
 }
 
+// ── V50: Room health is driven by the REAL signalling connection state,
+//    not cosmetic text. States: connecting | online | reconnecting | offline
+let roomHealthState = 'connecting';
+
+function setRoomHealth(state) {
+  roomHealthState = state;
+  updateRoomHealth();
+}
+
 function updateRoomHealth() {
   const el = $('roomHealth');
   if (!el) return;
-  el.textContent = turnRelayAvailable
-    ? 'Room online. Relay support is active for guests on difficult networks.'
-    : 'Room online. Relay support is not configured, so some guests on restrictive Wi-Fi may need to try another network.';
+  el.classList.remove('health-online', 'health-warn', 'health-offline');
+  if (roomHealthState === 'online') {
+    el.classList.add('health-online');
+    el.textContent = turnRelayAvailable
+      ? '● Room online — guests can join. Relay support is active for difficult networks.'
+      : '● Room online — guests can join. Relay support is not configured, so guests on restrictive Wi-Fi may need another network.';
+  } else if (roomHealthState === 'reconnecting') {
+    el.classList.add('health-warn');
+    el.textContent = '● Reconnecting to the room service… New guests cannot join until this reconnects. Connected guests and recording are not affected.';
+  } else if (roomHealthState === 'offline') {
+    el.classList.add('health-offline');
+    el.textContent = '● Room offline — new guests cannot join. Refresh this page to bring the room back online. Any active recording keeps running.';
+  } else {
+    el.textContent = '● Setting up the room…';
+  }
 }
+
+// ── V50: Signalling auto-reconnect (host AND guest) ──
+// The free PeerJS cloud drops idle connections. Without this, a room that
+// sits open looks alive but is unreachable — guests spin on "Connecting to
+// host…" forever. Exponential backoff, retries indefinitely while the page
+// is open, and reconnects immediately when the tab becomes visible again.
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+
+function scheduleSignallingReconnect() {
+  if (reconnectTimer) return;
+  if (!peer || peer.destroyed) return;
+  const delay = Math.min(30000, 2000 * Math.pow(2, Math.min(4, reconnectAttempt)));
+  reconnectAttempt += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (!peer || peer.destroyed || !peer.disconnected) return;
+    try { peer.reconnect(); } catch(e) {}
+    // If still disconnected after this attempt settles, schedule the next one.
+    setTimeout(() => {
+      if (peer && !peer.destroyed && peer.disconnected) scheduleSignallingReconnect();
+    }, 5000);
+  }, delay);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (peer && !peer.destroyed && peer.disconnected) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    reconnectAttempt = 0;
+    try { peer.reconnect(); } catch(e) {}
+  }
+});
 
 function setupWaitingControls() {
   const rejoinBtn = $('guestRejoinBtn');
@@ -443,11 +504,40 @@ function setupWaitingControls() {
 async function initPeer(id) {
   myPeerId = id;
   const iceServers = await getIceServers();
-  peer = new Peer(id, {
-    debug: 0,
-    config: { iceServers }
+  // V50: optional self-hosted PeerServer via config.js — falls back to the
+  // public PeerJS cloud when window.VOX5000_PEER_CONFIG is not set.
+  const peerOptions = { debug: 0, config: { iceServers } };
+  if (window.VOX5000_PEER_CONFIG && window.VOX5000_PEER_CONFIG.host) {
+    const pc = window.VOX5000_PEER_CONFIG;
+    peerOptions.host = pc.host;
+    if (pc.port) peerOptions.port = pc.port;
+    if (pc.path) peerOptions.path = pc.path;
+    if (pc.key) peerOptions.key = pc.key;
+    peerOptions.secure = pc.secure !== false;
+  }
+  peer = new Peer(id, peerOptions);
+  peer.on('open', () => {
+    reconnectAttempt = 0;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    setRoomHealth('online');
+    if (isHost) {
+      if (!hostRoomShown) showHostRoom();
+      else hostSystemMsg('✓ Reconnected to the room service. Guests can join again.');
+    } else {
+      // V50: WebRTC data connections survive signalling drops. If our link to
+      // the host is still open, do NOT reconnect — that would close the live
+      // connection and make the host treat us as having left mid-session.
+      const hostConn = peers['host'] && peers['host'].conn;
+      if (hostConn && hostConn.open) {
+        guestSystemMsg('✓ Reconnected to the room service.');
+        const rb = $('guestRejoinBtn');
+        if (rb) rb.style.display = 'none';
+      } else {
+        connectToHost();
+      }
+    }
   });
-  peer.on('open', () => { if (isHost) showHostRoom(); else connectToHost(); });
   peer.on('connection', conn => handleIncomingConn(conn));
   peer.on('call', call => {
     if (myIsObserver) {
@@ -505,12 +595,21 @@ async function initPeer(id) {
     }
   });
   peer.on('disconnected', () => {
-    if (!isHost) {
-      guestSystemMsg('Connection lost. Trying to reconnect…');
+    // V50: this fires for BOTH roles when the signalling server drops us.
+    // Existing WebRTC audio and data connections between participants keep
+    // working — but no NEW guest can reach the host until we re-register.
+    setRoomHealth('reconnecting');
+    if (isHost) {
+      hostSystemMsg('⚠ Lost connection to the room service — reconnecting. Current guests and recording are unaffected, but new guests cannot join until this recovers.');
+    } else {
+      guestSystemMsg('Connection to the room service lost. Trying to reconnect…');
       const rb = $('guestRejoinBtn');
       if (rb) rb.style.display = 'block';
-      setTimeout(() => { if (peer && !peer.destroyed) { try { peer.reconnect(); } catch(e) {} } }, 2000);
     }
+    scheduleSignallingReconnect();
+  });
+  peer.on('close', () => {
+    setRoomHealth('offline');
   });
 }
 
@@ -610,6 +709,7 @@ function handleHostMessage(data, conn) {
   if (data.type === 'chat') guestAddChat(data.sender, data.text, false);
   if (data.type === 'countdown_start') runGuestCountdown(data.from);
   if (data.type === 'record_start') {
+    if (data.hostEpoch) recordingStartedEpoch = data.hostEpoch;
     if ($('countdownScreen')) $('countdownScreen').style.display = 'none';
     if ($('guestRoom')) $('guestRoom').style.display = 'block';
     if (!myIsObserver && (!mediaRecorder || mediaRecorder.state === 'inactive')) startGuestRecording();
@@ -846,7 +946,7 @@ window.admitGuest = function(peerId) {
   renderParticipants();
   hostSystemMsg(`${p.name} has joined${p.observer ? ' as Observer' : ''}.`);
   broadcastParticipantUpdate();
-  if (recording && !p.observer) p.conn.send({ type: 'record_start' });
+  if (recording && !p.observer) p.conn.send({ type: 'record_start', hostEpoch: recordingStartedEpoch });
 };
 
 window.denyGuest = function(peerId) {
@@ -1274,6 +1374,7 @@ function drawWave(canvas, anal, token, peerId) {
 
 // ── Show rooms ──
 function showHostRoom() {
+  hostRoomShown = true;
   if ($('waitingScreen')) $('waitingScreen').style.display = 'none';
   if ($('hostRoom')) $('hostRoom').style.display = 'block';
   const rd = getRooms()[roomId] || {};
@@ -1914,7 +2015,7 @@ function startSession() {
       if ($('countdownScreen')) $('countdownScreen').style.display = 'none';
       if ($('hostRoom')) $('hostRoom').style.display = 'block';
       beginRecording();
-      broadcastToGuests({ type: 'record_start' });
+      broadcastToGuests({ type: 'record_start', hostEpoch: recordingStartedEpoch });
     } else {
       setText($('countdownNumber'), count);
     }
@@ -1922,6 +2023,8 @@ function startSession() {
 }
 
 function beginRecording() {
+  recordingStartedEpoch = Date.now();
+  localRecordStartedEpoch = recordingStartedEpoch;
   chunks = []; rawChunks = [];
   recording = true; paused = false; elapsed = 0;
   startTime = Date.now();
@@ -1949,6 +2052,9 @@ function beginRecording() {
 function stopSession() {
   recording = false; paused = false;
   clearInterval(timerInterval);
+  // V50 (audit A16): snapshot how many guest tracks we expect NOW, so a guest
+  // disconnecting after their transfer cannot skew the "All tracks received" logic.
+  expectedTransferCount = Object.values(peers).filter(p => !p.pending && !p.observer).length;
   const oa = $('onAir'); if (oa) oa.classList.remove('visible');
   const recBtn = $('recBtn');
   if (recBtn) { recBtn.classList.remove('recording'); recBtn.innerHTML = '<span class="rec-dot"></span> Record'; }
@@ -2001,6 +2107,7 @@ function stopLocalRecording(cb) {
 // ── Guest recording ──
 function startGuestRecording() {
   if (!processedDest) { guestSystemMsg('⚠ Mic not ready — your audio may not be recorded.'); return; }
+  localRecordStartedEpoch = Date.now();
   chunks = []; rawChunks = [];
   guestBackupBlob = null;
   guestTransferBlob = null;
@@ -2056,7 +2163,8 @@ function sendFileToHost(hostConn, blob, mimeType) {
   const CHUNK = 65536, BUFFER_HIGH = 524288, BUFFER_LOW = 131072;
   const totalChunks = Math.ceil(blob.size / CHUNK);
   if (peers['host']) peers['host'].transferring = true;
-  hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType });
+  const startOffsetMs = (recordingStartedEpoch && localRecordStartedEpoch) ? Math.max(0, localRecordStartedEpoch - recordingStartedEpoch) : null;
+  hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType, startOffsetMs });
 
   let offset = 0, seq = 0, sending = false, waitingBuf = false;
   const dc = hostConn.dataChannel || hostConn._dc;
@@ -2224,7 +2332,9 @@ async function finaliseGuestTrack(peerId, conn) {
   const safe = (p.name || 'Guest').replace(/[^a-zA-Z0-9]/g, '_');
   const ext = mimeType.includes('mp3') || mimeType.includes('mpeg') ? 'mp3' : 'webm';
   const sizeMb = (blob.size / 1048576).toFixed(1);
-  addDownloadItem(`${p.name || 'Guest'} track`, `${ext.toUpperCase()} · ${sizeMb} MB`, URL.createObjectURL(blob), `${safe}_${ts}.${ext}`);
+  // V50 (audit A12): show alignment offset so tracks can be lined up in a DAW
+  const offsetNote = Number.isFinite(meta.startOffsetMs) ? ` · starts +${(meta.startOffsetMs / 1000).toFixed(2)}s` : '';
+  addDownloadItem(`${p.name || 'Guest'} track`, `${ext.toUpperCase()} · ${sizeMb} MB${offsetNote}`, URL.createObjectURL(blob), `${safe}_${ts}.${ext}`);
   hostSystemMsg(`✓ ${p.name}'s track received (${sizeMb} MB).`);
   if ($('dlSection')) $('dlSection').style.display = 'block';
   checkAllDone();
@@ -2260,9 +2370,8 @@ async function buildCombinedDownload() {
 }
 
 function checkAllDone() {
-  const guests = Object.values(peers).filter(p => !p.pending && !p.observer);
   const done = document.querySelectorAll('.transfer-done').length;
-  if (done >= guests.length && guests.length > 0) {
+  if (done >= expectedTransferCount && expectedTransferCount > 0) {
     const note = $('transferNote');
     if (note) { note.innerHTML = ''; const s = document.createElement('strong'); s.style.color = 'var(--green)'; s.textContent = '✓ All tracks received.'; note.appendChild(s); }
     setText($('hostDurStatus'), 'Done');
@@ -2279,6 +2388,7 @@ function generateConsentLog() {
     `Room ID: ${roomId}`,
     `Room Name: ${roomData.name || 'Interview Room'}`,
     `Session date: ${new Date().toUTCString()}`,
+    recordingStartedEpoch ? `Recording started (host clock): ${new Date(recordingStartedEpoch).toISOString()}` : 'Recording started: not recorded this session',
     `Log generated: ${tsNow()}`,
     '',
     'This log documents participant consent for recording purposes.',
