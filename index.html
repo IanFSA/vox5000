@@ -80,6 +80,19 @@
       </article>
     </section>
 
+    <section class="join-room-strip" aria-label="Join an interview room">
+      <div>
+        <strong>Have an invite?</strong>
+        <span>Paste a room link or code.</span>
+      </div>
+      <form id="homeJoinForm" class="join-room-form" novalidate>
+        <label class="sr-only" for="homeJoinInput">Room link or code</label>
+        <input id="homeJoinInput" type="text" autocomplete="off" spellcheck="false" placeholder="Room link or code" />
+        <button type="submit">Join room →</button>
+      </form>
+      <p id="homeJoinError" class="join-room-error" aria-live="polite"></p>
+    </section>
+
     <section class="trust-row" aria-label="VOX5000 benefits">
       <div><strong>No install</strong><span>Works in your browser</span></div>
       <div><strong>No account</strong><span>Start right away</span></div>
@@ -96,5 +109,37 @@
       <a href="/privacy">Privacy Policy</a>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      const form = document.getElementById('homeJoinForm');
+      const input = document.getElementById('homeJoinInput');
+      const error = document.getElementById('homeJoinError');
+      if (!form || !input) return;
+
+      function extractRoomCode(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        try {
+          const url = new URL(raw, window.location.origin);
+          const code = url.searchParams.get('r');
+          if (code) return code.trim();
+        } catch (e) {}
+        return raw.replace(/^#/, '').trim();
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        const code = extractRoomCode(input.value);
+        if (!/^[A-Za-z0-9-]{4,24}$/.test(code)) {
+          if (error) error.textContent = 'Enter a valid room link or code.';
+          input.focus();
+          return;
+        }
+        if (error) error.textContent = '';
+        window.location.href = '/room?r=' + encodeURIComponent(code.toUpperCase());
+      });
+    })();
+  </script>
 </body>
 </html>

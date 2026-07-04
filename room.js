@@ -473,18 +473,41 @@ function getMic() {
 
 // ── Guest → Host ──
 function connectToHost() {
+  setText($('waitingTitle'), 'Connecting to host…');
+  setText($('waitingSub'), 'Opening the room link. Keep this page open.');
   const conn = peer.connect(`HOST-${roomId}`, { reliable: true });
+  let joinAcked = false;
   conn.on('open', () => {
     conn.send({ type: 'join_request', name: myName, peerId: myPeerId, consented: myConsented, observer: myIsObserver });
     peers['host'] = { conn, name: 'Host', transferring: false };
+    setText($('waitingTitle'), 'Waiting to be admitted');
+    setText($('waitingSub'), 'Your request has been sent to the host. Keep this page open.');
+    setTimeout(() => {
+      if (!joinAcked && $('waitingScreen') && $('waitingScreen').style.display !== 'none') {
+        setText($('waitingSub'), 'Still waiting. If the host cannot see you, ask them to check the room link or refresh the room.');
+        const rb = $('guestRejoinBtn');
+        if (rb) rb.style.display = 'block';
+      }
+    }, 10000);
   });
-  conn.on('data', data => handleHostMessage(data, conn));
+  conn.on('data', data => {
+    if (data.type === 'join_ack') joinAcked = true;
+    handleHostMessage(data, conn);
+  });
   conn.on('close', () => {
+    setText($('waitingTitle'), 'Could not reach host');
+    setText($('waitingSub'), 'The room connection closed. Ask the host to confirm the room is open, then try reconnecting.');
     guestSystemMsg('Disconnected from host.');
     const rb = $('guestRejoinBtn');
     if (rb) rb.style.display = 'block';
   });
-  conn.on('error', err => console.error('Guest conn error:', err));
+  conn.on('error', err => {
+    console.error('Guest conn error:', err);
+    setText($('waitingTitle'), 'Could not reach host');
+    setText($('waitingSub'), 'The room link did not connect. Check the link and try again.');
+    const rb = $('guestRejoinBtn');
+    if (rb) rb.style.display = 'block';
+  });
 }
 
 function handleHostMessage(data, conn) {
@@ -569,6 +592,7 @@ function handleIncomingConn(conn) {
   conn.on('data', data => {
     if (data.type === 'join_request') {
       if (peers[conn.peer] && !peers[conn.peer].pending) return;
+      try { conn.send({ type: 'join_ack' }); } catch(e) {}
       // P5: name comes from guest — store raw but always display via textContent
       const safeName = String(data.name || 'Guest').substr(0, 80);
       peers[conn.peer] = { conn, name: safeName, pending: true, consented: data.consented, observer: data.observer, muted: false, selfMuted: false, transferring: false };
@@ -648,6 +672,9 @@ function broadcastParticipantUpdate() {
 }
 
 function showWaitingGuest(peerId, name, consented, observer) {
+  const sharePanel = $('sharePanel');
+  if (sharePanel) sharePanel.style.display = 'none';
+
   const wq = $('waitingQueue');
   if (wq) wq.style.display = 'block';
 
