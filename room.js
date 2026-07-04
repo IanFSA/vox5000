@@ -85,6 +85,7 @@ let myName = '', myPeerId = '', myConsented = false, myIsObserver = false;
 let recording = false, paused = false, elapsed = 0, startTime, timerInterval;
 let mediaRecorder, chunks = [], rawChunks = [];
 let audioCtx, localStream, gainNode, processedDest, hostAnalyser, guestGainNode, guestAnalyser;
+let audioGraphToken = 0;
 let combinedDest, combinedRecorder, combinedChunks = [];
 const combinedSources = {};
 const remoteStreams = {};
@@ -92,7 +93,12 @@ let peer;
 const peers = {}; // peerId → { conn, call, name, pending, consented, observer, muted, selfMuted, analyser }
 const receivedChunks = {}, receivedMeta = {};
 let guestBackupBlob = null;
+let guestTransferBlob = null;
+let guestTransferMimeType = 'audio/webm';
+let guestTransferConn = null;
+let transferComplete = false;
 let masterOutputVolume = 1.0;
+let currentOutputDeviceId = '';
 let inputGainDb = 0;
 let noiseSuppression = false;
 let echoCancellation = false;
@@ -100,6 +106,7 @@ let currentMicId;
 let hostSelfMuted = false;
 const consentLog = [];
 let hostReturning = false;
+let settingsPanelBound = false;
 
 // ── Helpers ──
 function fmt(s) {
@@ -107,8 +114,9 @@ function fmt(s) {
   return [h,m,sec].map(v => String(v).padStart(2,'0')).join(':');
 }
 function randId(n) {
-  return crypto.getRandomValues(new Uint8Array(Math.ceil(n*3/4)))
-    .reduce((a,b) => a + b.toString(36), '').substr(0, n).toUpperCase();
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(n));
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
 }
 function initials(name) {
   return String(name).split(' ').map(w => w[0] || '').join('').substr(0,2).toUpperCase();
@@ -203,7 +211,13 @@ if (isHost && $('roomNameSection')) $('roomNameSection').style.display = 'block'
 if ($('hasHeadphones')) $('hasHeadphones').addEventListener('click', () => { $('headphoneScreen').style.display = 'none'; $('nameScreen').style.display = 'flex'; });
 if ($('noHeadphones')) $('noHeadphones').addEventListener('click', () => { $('headphoneScreen').style.display = 'none'; $('feedbackWarnScreen').style.display = 'flex'; });
 if ($('nowHasHeadphones')) $('nowHasHeadphones').addEventListener('click', () => { $('feedbackWarnScreen').style.display = 'none'; $('nameScreen').style.display = 'flex'; });
-if ($('continueAnyway')) $('continueAnyway').addEventListener('click', () => { $('feedbackWarnScreen').style.display = 'none'; $('nameScreen').style.display = 'flex'; });
+if ($('continueAnyway')) $('continueAnyway').addEventListener('click', () => {
+  echoCancellation = true;
+  const ec = $('settingsEchoCancellation');
+  if (ec) ec.checked = true;
+  $('feedbackWarnScreen').style.display = 'none';
+  $('nameScreen').style.display = 'flex';
+});
 
 // ── Name entry ──
 if ($('enterRoomBtn')) $('enterRoomBtn').addEventListener('click', enterRoom);
@@ -226,8 +240,8 @@ async function enterRoom() {
     myIsObserver = false;
     $('nameScreen').style.display = 'none';
 
-    // Generate room code
-    roomId = randId(6);
+    // Keep an owned room code when reopening an existing host link.
+    roomId = urlCode && checkIsHost() ? urlCode : randId(6);
     const customName = ($('roomNameInput') || {}).value || '';
     const roomName = customName.trim() || 'Interview Room';
     saveRoom(roomId, { name: roomName, created: Date.now() });
@@ -244,7 +258,7 @@ async function enterRoom() {
 }
 
 // ── Guest mic select + pre-room test ──
-let preMeterActive = false, preMeterStream = null;
+let preMeterActive = false, preMeterStream = null, preMeterCtx = null;
 
 async function showGuestMicSelect() {
   const screen = $('guestMicScreen');
@@ -290,7 +304,11 @@ async function showGuestMicSelect() {
           const audio = new Audio(URL.createObjectURL(blob));
           audio.play();
           setText(res, '▶ Playing back — listen for your voice');
-          audio.onended = () => { setText(res, '✓ Done. If you heard yourself your mic is working.'); testBtn.disabled = false; };
+          audio.onended = () => {
+            ctx.close().catch(() => {});
+            setText(res, '✓ Done. If you heard yourself your mic is working.');
+            testBtn.disabled = false;
+          };
         };
         mr.start();
         setTimeout(() => mr.stop(), 5000);
@@ -307,6 +325,7 @@ function startPreMeter() {
     .then(s => {
       preMeterStream = s;
       const ctx = new AudioContext();
+      preMeterCtx = ctx;
       const anal = ctx.createAnalyser(); anal.fftSize = 512;
       ctx.createMediaStreamSource(s).connect(anal);
       const buf = new Uint8Array(anal.frequencyBinCount);
@@ -326,6 +345,7 @@ function startPreMeter() {
 function stopPreMeter() {
   preMeterActive = false;
   if (preMeterStream) { preMeterStream.getTracks().forEach(t => t.stop()); preMeterStream = null; }
+  if (preMeterCtx) { preMeterCtx.close().catch(() => {}); preMeterCtx = null; }
 }
 
 window.proceedToConsent = function() {
@@ -373,19 +393,52 @@ async function initPeer(id) {
   peer.on('open', () => { if (isHost) showHostRoom(); else connectToHost(); });
   peer.on('connection', conn => handleIncomingConn(conn));
   peer.on('call', call => {
-    getMic().then(s => {
-      // Observer joins with empty stream — they can hear but mic is off
-      call.answer(myIsObserver ? new MediaStream() : s);
+    if (myIsObserver) {
+      call.answer(new MediaStream());
+      if (!isHost) peers['host'] = { ...(peers['host'] || {}), call, name: 'Host', transferring: false };
       call.on('stream', remote => {
-        addRemoteAudio(call.peer, remote);
+        addRemoteAudio('host', remote);
+        applyOutputVolume(masterOutputVolume);
+        if (remote && remote.getAudioTracks().length > 0) setupGuestSpeakingIndicator('host', 'Host', remote);
+      });
+      return;
+    }
+    getMic().then(s => {
+      if (isHost && !hostAnalyser) setupHostAudioGraph(s);
+      if (!isHost && !myIsObserver && !guestAnalyser) setupGuestAudioGraph(s);
+      const answerStream = processedDest ? processedDest.stream : s;
+      call.answer(answerStream);
+      if (peers[call.peer]) peers[call.peer].call = call;
+      else if (!isHost) peers['host'] = { ...(peers['host'] || {}), call, name: 'Host', transferring: false };
+      call.on('stream', remote => {
+        const remoteId = !isHost ? 'host' : call.peer;
+        addRemoteAudio(remoteId, remote);
+        applyOutputVolume(masterOutputVolume);
         if (remote && remote.getAudioTracks().length > 0) {
-          setupRemoteAnalyser(call.peer, remote);
+          if (isHost) setupRemoteAnalyser(call.peer, remote);
+          else setupGuestSpeakingIndicator('host', 'Host', remote);
         }
       });
     });
   });
   peer.on('error', err => {
     console.error('Peer error:', err.type, err);
+    if (isHost) {
+      if (err.type === 'unavailable-id' && !hostReturning) {
+        try { if (peer && !peer.destroyed) peer.destroy(); } catch(e) {}
+        roomId = randId(6);
+        saveRoom(roomId, { name: (($('roomNameInput') || {}).value || '').trim() || 'Interview Room', created: Date.now() });
+        markAsOwner(roomId);
+        saveHostSession({ roomId, name: myName });
+        window.history.replaceState({}, '', `?r=${encodeURIComponent(roomId)}`);
+        hostSystemMsg('Room code refreshed after a setup collision.');
+        showLoadingThenHostRoom();
+        return;
+      }
+      setText($('waitingTitle'), 'Could not set up this room');
+      setText($('waitingSub'), 'Please refresh and try again.');
+      return;
+    }
     if (!isHost && err.type === 'peer-unavailable') {
       guestSystemMsg('Could not reach the host room. Check the link and try again.');
       const rb = $('guestRejoinBtn');
@@ -438,20 +491,10 @@ function handleHostMessage(data, conn) {
   if (data.type === 'admitted') {
     if ($('waitingScreen')) $('waitingScreen').style.display = 'none';
     showGuestRoom();
-    getMic().then(s => {
-      setupGuestAudioGraph(s);
-      // P3: call with processed stream so gain affects what host hears
-      const callStream = myIsObserver ? new MediaStream() : (processedDest ? processedDest.stream : s);
-      const call = peer.call(`HOST-${roomId}`, callStream);
-      call.on('stream', remote => {
-        addRemoteAudio('host', remote);
-        applyOutputVolume(masterOutputVolume);
-        if (remote && remote.getAudioTracks().length > 0) {
-          setupGuestSpeakingIndicator('host', 'Host', remote);
-        }
-      });
-    });
     guestSystemMsg(`You are in the room${myIsObserver ? ' as an Observer (mic off, not recorded)' : ''}.`);
+  }
+  if (data.type === 'chunk_resend') {
+    resendRequestedChunks(data.indices || []);
   }
   if (data.type === 'denied') {
     if ($('waitingScreen')) $('waitingScreen').style.display = 'none';
@@ -465,7 +508,7 @@ function handleHostMessage(data, conn) {
   if (data.type === 'record_start') {
     if ($('countdownScreen')) $('countdownScreen').style.display = 'none';
     if ($('guestRoom')) $('guestRoom').style.display = 'block';
-    if (!myIsObserver) startGuestRecording();
+    if (!myIsObserver && (!mediaRecorder || mediaRecorder.state === 'inactive')) startGuestRecording();
     setText($('guestStatusDisplay'), '🔴 Recording');
     setText($('guestMicStatus'), 'Active — speak to see your level');
   }
@@ -493,6 +536,7 @@ function handleHostMessage(data, conn) {
     if ($('guestDoneCard')) $('guestDoneCard').style.display = 'block';
     setText($('guestStatusDisplay'), '✓ Track received by host — you may close this window');
     if (peers['host']) peers['host'].transferring = false;
+    transferComplete = true;
   }
   if (data.type === 'transfer_failed') {
     if ($('guestUploadCard')) $('guestUploadCard').style.display = 'none';
@@ -542,21 +586,27 @@ function handleIncomingConn(conn) {
     }
     // P7: Receive raw WebM chunks — no MP3 conversion required
     if (data.type === 'file_meta') {
-      receivedMeta[conn.peer] = data;
+      receivedMeta[conn.peer] = { ...data, done: false, finalised: false };
       receivedChunks[conn.peer] = [];
       if (peers[conn.peer]) peers[conn.peer].transferring = true;
       addTransferRow(conn.peer, peers[conn.peer] ? peers[conn.peer].name : 'Guest', data.size, data.totalChunks);
     }
     if (data.type === 'file_chunk') {
       if (!receivedChunks[conn.peer]) receivedChunks[conn.peer] = [];
-      receivedChunks[conn.peer].push(data.chunk);
+      const seq = Number.isFinite(data.seq) ? data.seq : receivedChunks[conn.peer].length;
+      receivedChunks[conn.peer][seq] = data.chunk;
       const meta = receivedMeta[conn.peer];
       if (meta) {
-        const pct = Math.min(99, Math.round((receivedChunks[conn.peer].length / meta.totalChunks) * 100));
+        const receivedCount = receivedChunks[conn.peer].filter(Boolean).length;
+        const pct = Math.min(99, Math.round((receivedCount / meta.totalChunks) * 100));
         updateTransferBar(conn.peer, pct);
+        if (meta.done) finaliseGuestTrack(conn.peer, conn);
       }
     }
-    if (data.type === 'file_done') finaliseGuestTrack(conn.peer, conn);
+    if (data.type === 'file_done') {
+      if (receivedMeta[conn.peer]) receivedMeta[conn.peer].done = true;
+      finaliseGuestTrack(conn.peer, conn);
+    }
     if (data.type === 'guest_leaving') {
       const p = peers[conn.peer];
       hostSystemMsg(`${p ? p.name : 'A guest'} has left.`);
@@ -634,9 +684,9 @@ function showWaitingGuest(peerId, name, consented, observer) {
   hostSystemMsg(`⚡ ${name} is waiting to join.`); // hostSystemMsg uses textContent
 
   // Browser notification
-  if (Notification && Notification.permission === 'granted') {
+  if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Vox5000', { body: `${name} is waiting to join`, icon: 'favicon-512.png' });
-  } else if (Notification && Notification.permission !== 'denied') {
+  } else if ('Notification' in window && Notification.permission !== 'denied') {
     Notification.requestPermission().then(p => {
       if (p === 'granted') new Notification('Vox5000', { body: `${name} is waiting to join`, icon: 'favicon-512.png' });
     });
@@ -746,6 +796,8 @@ function showThankyou(msg) {
 //                       ↘ audioCtx.destination (for monitoring — but only through a muted gain node unless user enables monitoring)
 
 function setupHostAudioGraph(s) {
+  audioGraphToken += 1;
+  const token = audioGraphToken;
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
   localStream = s;
   const src = audioCtx.createMediaStreamSource(s);
@@ -759,11 +811,13 @@ function setupHostAudioGraph(s) {
   gainNode.connect(hostAnalyser);
   gainNode.connect(processedDest); // this is what MediaRecorder and WebRTC peers receive
 
-  drawMeterHost(hostAnalyser);
-  addWaveformRow('local', myName + ' (You)', hostAnalyser);
+  drawMeterHost(hostAnalyser, token);
+  addWaveformRow('local', myName + ' (You)', hostAnalyser, token);
 }
 
 function setupGuestAudioGraph(s) {
+  audioGraphToken += 1;
+  const token = audioGraphToken;
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext({ sampleRate: 48000 });
   localStream = s;
   const src = audioCtx.createMediaStreamSource(s);
@@ -777,9 +831,56 @@ function setupGuestAudioGraph(s) {
   guestGainNode.connect(guestAnalyser);
   guestGainNode.connect(processedDest); // recorded + sent via WebRTC
 
-  drawGuestMeterLoop(guestAnalyser);
-  drawWave($('guestWaveCanvas'), guestAnalyser);
+  drawGuestMeterLoop(guestAnalyser, token);
+  drawWave($('guestWaveCanvas'), guestAnalyser, token);
   setText($('guestMicStatus'), 'Active — speak to see your level');
+}
+
+function currentProcessedTrack() {
+  return processedDest && processedDest.stream
+    ? processedDest.stream.getAudioTracks()[0]
+    : null;
+}
+
+async function replaceOutgoingAudioTrack() {
+  const track = currentProcessedTrack();
+  if (!track || myIsObserver) return;
+  const calls = [];
+  if (isHost) {
+    Object.values(peers).forEach(p => { if (!p.pending && p.call) calls.push(p.call); });
+  } else if (peers['host'] && peers['host'].call) {
+    calls.push(peers['host'].call);
+  }
+  await Promise.all(calls.map(async call => {
+    try {
+      const pc = call.peerConnection;
+      const sender = pc && pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+      if (sender) await sender.replaceTrack(track);
+    } catch(e) {
+      console.warn('replaceTrack error:', e);
+    }
+  }));
+}
+
+async function rebuildLocalAudio(reason) {
+  if (recording) {
+    alert('Stop recording before changing audio processing settings.');
+    return false;
+  }
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  localStream = null;
+  const s = await getMic();
+  if (isHost) setupHostAudioGraph(s);
+  else if (!myIsObserver) setupGuestAudioGraph(s);
+  await replaceOutgoingAudioTrack();
+  if (reason) {
+    const track = s.getAudioTracks()[0];
+    const applied = track && track.getSettings ? track.getSettings() : {};
+    const echoText = applied.echoCancellation === undefined ? '' : ` Echo cancellation: ${applied.echoCancellation ? 'on' : 'off'}.`;
+    if (isHost) hostSystemMsg(`${reason}.${echoText}`);
+    else guestSystemMsg(`${reason}.${echoText}`);
+  }
+  return true;
 }
 
 // ── Remote audio ──
@@ -794,6 +895,9 @@ function addRemoteAudio(peerId, remoteStream) {
     if (ae) ae.appendChild(a);
   }
   a.srcObject = remoteStream;
+  if (currentOutputDeviceId && a.setSinkId) {
+    a.setSinkId(currentOutputDeviceId).catch(e => console.warn('setSinkId failed:', e));
+  }
   remoteStreams[peerId] = remoteStream;
   if (isHost) addStreamToCombinedMix(peerId, remoteStream);
   // P9: cap at 100%
@@ -859,19 +963,23 @@ function stopCombinedRecording() {
 function setupRemoteAnalyser(peerId, remote) {
   if (!audioCtx) return;
   try {
+    const token = Date.now() + Math.random();
     const anal = audioCtx.createAnalyser(); anal.fftSize = 512;
     audioCtx.createMediaStreamSource(remote).connect(anal);
-    if (peers[peerId]) peers[peerId].analyser = anal;
-    drawMeterPeer(peerId, anal);
+    if (peers[peerId]) {
+      peers[peerId].analyser = anal;
+      peers[peerId].analyserToken = token;
+    }
+    drawMeterPeer(peerId, anal, token);
     if (isHost) {
       const p = peers[peerId];
-      addWaveformRow(peerId, p ? p.name : 'Guest', anal);
+      addWaveformRow(peerId, p ? p.name : 'Guest', anal, token);
     }
   } catch(e) { console.warn('Remote analyser error:', e); }
 }
 
 // ── Waveform rows (host view) ──
-function addWaveformRow(id, name, analyser) {
+function addWaveformRow(id, name, analyser, token) {
   const container = $('allWaveforms');
   if (!container) return;
   const existing = document.getElementById(`wrow-${id}`);
@@ -894,13 +1002,14 @@ function addWaveformRow(id, name, analyser) {
   wrap.appendChild(label);
   wrap.appendChild(canvas);
   container.appendChild(wrap);
-  drawWave(canvas, analyser);
+  drawWave(canvas, analyser, token, id);
 }
 
 // ── Guest speaking indicators ──
 function setupGuestSpeakingIndicator(peerId, name, remoteStream) {
   if (!audioCtx) audioCtx = new AudioContext({ sampleRate: 48000 });
   try {
+    const token = Date.now() + Math.random();
     const anal = audioCtx.createAnalyser(); anal.fftSize = 256;
     audioCtx.createMediaStreamSource(remoteStream).connect(anal);
     const card = $('guestSpeakingCard');
@@ -930,6 +1039,7 @@ function setupGuestSpeakingIndicator(peerId, name, remoteStream) {
     const dot = document.getElementById(`speak-dot-${peerId}`);
     const buf = new Uint8Array(anal.frequencyBinCount);
     function tick() {
+      if (!document.getElementById(`speak-${peerId}`)) return;
       anal.getByteTimeDomainData(buf);
       let max = 0;
       for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]-128)/128; if (v>max) max=v; }
@@ -967,9 +1077,10 @@ function updateGuestSpeakingList(participants) {
 }
 
 // ── Meters ──
-function drawMeterHost(anal) {
+function drawMeterHost(anal, token) {
   const buf = new Uint8Array(anal.frequencyBinCount);
   function tick() {
+    if (token !== audioGraphToken) return;
     try { anal.getByteTimeDomainData(buf); } catch { return; }
     let max = 0;
     for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]-128)/128; if (v>max) max=v; }
@@ -980,9 +1091,10 @@ function drawMeterHost(anal) {
   tick();
 }
 
-function drawMeterPeer(peerId, anal) {
+function drawMeterPeer(peerId, anal, token) {
   const buf = new Uint8Array(anal.frequencyBinCount);
   function tick() {
+    if (!peers[peerId] || peers[peerId].analyserToken !== token) return;
     try { anal.getByteTimeDomainData(buf); } catch { return; }
     let max = 0;
     for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]-128)/128; if (v>max) max=v; }
@@ -993,9 +1105,10 @@ function drawMeterPeer(peerId, anal) {
   tick();
 }
 
-function drawGuestMeterLoop(anal) {
+function drawGuestMeterLoop(anal, token) {
   const buf = new Uint8Array(anal.frequencyBinCount);
   function tick() {
+    if (token !== audioGraphToken) return;
     try { anal.getByteTimeDomainData(buf); } catch { return; }
     let max = 0;
     for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]-128)/128; if (v>max) max=v; }
@@ -1007,11 +1120,14 @@ function drawGuestMeterLoop(anal) {
 }
 
 // ── Waveform drawing ──
-function drawWave(canvas, anal) {
+function drawWave(canvas, anal, token, peerId) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const buf2 = [];
   function tick() {
+    if (!canvas.isConnected) return;
+    if (peerId && peerId !== 'local' && peers[peerId] && peers[peerId].analyserToken !== token) return;
+    if ((!peerId || peerId === 'local') && token && token !== audioGraphToken) return;
     const W = canvas.offsetWidth || 600;
     if (canvas.width !== W) canvas.width = W;
     const H = canvas.height, mid = H / 2;
@@ -1313,6 +1429,12 @@ function setupSettingsPanel() {
     const ecCb = $('settingsEchoCancellation'); if (ecCb) ecCb.checked = echoCancellation;
   }
 
+  if (settingsPanelBound) {
+    populateDevices();
+    return;
+  }
+  settingsPanelBound = true;
+
   btn.addEventListener('click', () => { panel.style.display = 'flex'; populateDevices(); });
   if (closeBtn) closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
   panel.addEventListener('click', e => { if (e.target === panel) panel.style.display = 'none'; });
@@ -1348,6 +1470,7 @@ function setupSettingsPanel() {
   if (outDev) {
     outDev.addEventListener('change', async () => {
       const deviceId = outDev.value;
+      currentOutputDeviceId = deviceId;
       document.querySelectorAll('#audioElements audio').forEach(async a => {
         if (deviceId && a.setSinkId) {
           try { await a.setSinkId(deviceId); } catch(e) { console.warn('setSinkId failed:', e); }
@@ -1366,21 +1489,7 @@ function setupSettingsPanel() {
         return;
       }
       currentMicId = micSel.value;
-      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-      const newStream = await getMic();
-      if (isHost) {
-        setupHostAudioGraph(newStream);
-        Object.entries(peers).forEach(([pid, p]) => {
-          if (!p.pending && p.call) {
-            try {
-              const sender = p.call.peerConnection && p.call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
-              if (sender) sender.replaceTrack(newStream.getAudioTracks()[0]);
-            } catch(e) { console.warn('replaceTrack error:', e); }
-          }
-        });
-      } else {
-        setupGuestAudioGraph(newStream);
-      }
+      await rebuildLocalAudio('Microphone changed');
     });
   }
 
@@ -1394,9 +1503,7 @@ function setupSettingsPanel() {
         return;
       }
       noiseSuppression = nsCb.checked;
-      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-      const s = await getMic();
-      if (isHost) setupHostAudioGraph(s); else setupGuestAudioGraph(s);
+      await rebuildLocalAudio(`Noise suppression ${noiseSuppression ? 'enabled' : 'disabled'}`);
     });
   }
 
@@ -1410,9 +1517,7 @@ function setupSettingsPanel() {
         return;
       }
       echoCancellation = ecCb.checked;
-      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-      const s = await getMic();
-      if (isHost) setupHostAudioGraph(s); else setupGuestAudioGraph(s);
+      await rebuildLocalAudio(`Echo cancellation ${echoCancellation ? 'enabled' : 'disabled'}`);
     });
   }
 
@@ -1436,7 +1541,11 @@ function setupSettingsPanel() {
           const audio = new Audio(URL.createObjectURL(new Blob(bufs, { type: mr.mimeType })));
           audio.play();
           setText(res, '▶ Playing back…');
-          audio.onended = () => { setText(res, '✓ Done. If you heard yourself your mic is working.'); testBtn.disabled = false; };
+          audio.onended = () => {
+            ctx.close().catch(() => {});
+            setText(res, '✓ Done. If you heard yourself your mic is working.');
+            testBtn.disabled = false;
+          };
         };
         mr.start();
         setTimeout(() => mr.stop(), 5000);
@@ -1680,8 +1789,7 @@ function setupGuestControls() {
       const a = document.createElement('a');
       const safe = myName.replace(/[^a-zA-Z0-9]/g, '_');
       const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-      const ext = (guestBackupBlob && guestBackupBlob.type.includes('mp3')) ? 'mp3' : 'webm';
-      a.href = url; a.download = `${safe}_backup_${ts}.${ext}`; a.click();
+      a.href = url; a.download = `${safe}_backup_${ts}.webm`; a.click();
       URL.revokeObjectURL(url);
     });
   }
@@ -1791,6 +1899,12 @@ function stopLocalRecording(cb) {
 function startGuestRecording() {
   if (!processedDest) { guestSystemMsg('⚠ Mic not ready — your audio may not be recorded.'); return; }
   chunks = []; rawChunks = [];
+  guestBackupBlob = null;
+  guestTransferBlob = null;
+  guestTransferConn = null;
+  transferComplete = false;
+  recording = true;
+  paused = false;
   const opts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 256000 } : {};
   // P3: record processed stream
@@ -1804,82 +1918,49 @@ function startGuestRecording() {
 function stopGuestRecording(hostConn) {
   const oa = $('onAir'); if (oa) oa.classList.remove('visible');
   if ($('guestTimerCard')) $('guestTimerCard').style.display = 'none';
-  setText($('guestStatusDisplay'), 'Encoding and preparing your track…');
+  setText($('guestStatusDisplay'), 'Preparing your track…');
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    recording = false;
+    paused = false;
     encodeAndSendToHost(hostConn); return;
   }
-  mediaRecorder.onstop = () => encodeAndSendToHost(hostConn);
+  mediaRecorder.onstop = () => {
+    recording = false;
+    paused = false;
+    encodeAndSendToHost(hostConn);
+  };
   mediaRecorder.stop();
 }
 
-// Encode to MP3 then send — falls back to raw WebM if encoding fails
 async function encodeAndSendToHost(hostConn) {
   if (!rawChunks || rawChunks.length === 0) {
     showGuestTransferFailed('No audio was recorded. Check your microphone was working.');
     return;
   }
   if ($('guestUploadCard')) $('guestUploadCard').style.display = 'block';
-  setText($('guestUploadPct'), 'Encoding to MP3…');
+  setText($('guestUploadPct'), 'Preparing transfer…');
 
   const rawBlob = new Blob(rawChunks, { type: 'audio/webm' });
-  guestBackupBlob = rawBlob; // always store raw as backup
-
-  try {
-    const ctx = new AudioContext({ sampleRate: 48000 });
-    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
-    const mp3Blob = await encodeMp3Room(decoded, 256);
-    if (!mp3Blob || mp3Blob.size === 0) throw new Error('Empty MP3');
-    guestBackupBlob = mp3Blob; // upgrade backup to MP3
-    setText($('guestUploadPct'), 'Sending…');
-    sendFileToHost(hostConn, mp3Blob, 'audio/mp3');
-  } catch(err) {
-    console.warn('MP3 encode failed, sending raw WebM:', err);
-    setText($('guestUploadPct'), 'Sending raw audio…');
-    sendFileToHost(hostConn, rawBlob, 'audio/webm');
-  }
-}
-
-// MP3 encoder for room — loads lamejs from CDN
-function encodeMp3Room(audioBuffer, kbps) {
-  return new Promise((resolve, reject) => {
-    function doEncode() {
-      try {
-        const samples = audioBuffer.getChannelData(0);
-        const sr = audioBuffer.sampleRate;
-        const mp3enc = new lamejs.Mp3Encoder(1, sr, kbps);
-        const blockSize = 1152, mp3Data = [];
-        const int16 = new Int16Array(samples.length);
-        for (let i = 0; i < samples.length; i++) {
-          const s = Math.max(-1, Math.min(1, samples[i]));
-          int16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7FFF);
-        }
-        for (let i = 0; i < int16.length; i += blockSize) {
-          const enc = mp3enc.encodeBuffer(int16.subarray(i, i + blockSize));
-          if (enc.length > 0) mp3Data.push(new Uint8Array(enc));
-        }
-        const flushed = mp3enc.flush();
-        if (flushed.length > 0) mp3Data.push(new Uint8Array(flushed));
-        if (mp3Data.length === 0) { reject(new Error('No MP3 data')); return; }
-        resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
-      } catch(e) { reject(e); }
-    }
-    if (window.lamejs) { doEncode(); return; }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
-    script.onload = doEncode;
-    script.onerror = () => reject(new Error('Failed to load MP3 encoder'));
-    document.head.appendChild(script);
-  });
+  guestBackupBlob = rawBlob;
+  guestTransferBlob = rawBlob;
+  guestTransferMimeType = 'audio/webm';
+  guestTransferConn = hostConn;
+  setText($('guestUploadPct'), 'Sending…');
+  sendFileToHost(hostConn, rawBlob, 'audio/webm');
 }
 
 function sendFileToHost(hostConn, blob, mimeType) {
-  const CHUNK = 8192, BUFFER_HIGH = 32768, BUFFER_LOW = 8192;
+  const CHUNK = 65536, BUFFER_HIGH = 524288, BUFFER_LOW = 131072;
   const totalChunks = Math.ceil(blob.size / CHUNK);
   if (peers['host']) peers['host'].transferring = true;
   hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType });
 
-  let offset = 0, sending = false, waitingBuf = false;
+  let offset = 0, seq = 0, sending = false, waitingBuf = false;
   const dc = hostConn.dataChannel || hostConn._dc;
+  if (!dc) {
+    showGuestTransferFailed('Browser data channel was not ready. Download your backup and send it manually.');
+    return;
+  }
   if (dc) {
     dc.bufferedAmountLowThreshold = BUFFER_LOW;
     dc.addEventListener('bufferedamountlow', () => { if (waitingBuf) { waitingBuf = false; schedule(); } });
@@ -1910,12 +1991,13 @@ function sendFileToHost(hostConn, blob, mimeType) {
     }
     if (dc && dc.bufferedAmount > BUFFER_HIGH) { waitingBuf = true; return; }
     sending = true;
+    const thisSeq = seq;
     const slice = blob.slice(offset, offset + CHUNK);
-    const reader = new FileReader();
-    reader.onload = e => {
+    slice.arrayBuffer().then(buffer => {
       try {
-        hostConn.send({ type: 'file_chunk', chunk: e.target.result });
+        hostConn.send({ type: 'file_chunk', seq: thisSeq, chunk: buffer });
         offset += CHUNK;
+        seq += 1;
         const pct = Math.min(99, Math.round(offset / blob.size * 100));
         const bar = $('guestUploadBar'), pctEl = $('guestUploadPct');
         if (bar) bar.style.width = pct + '%';
@@ -1923,14 +2005,36 @@ function sendFileToHost(hostConn, blob, mimeType) {
       } catch(err) { sending = false; clearInterval(transferTimeout); showGuestTransferFailed(); return; }
       sending = false;
       schedule();
-    };
-    reader.onerror = () => { sending = false; clearInterval(transferTimeout); showGuestTransferFailed(); };
-    reader.readAsArrayBuffer(slice);
+    }).catch(() => { sending = false; clearInterval(transferTimeout); showGuestTransferFailed(); });
   }
   schedule();
 }
 
+function resendRequestedChunks(indices) {
+  if (!guestTransferBlob || !guestTransferConn || !Array.isArray(indices) || !indices.length) return;
+  const CHUNK = 65536;
+  const dc = guestTransferConn.dataChannel || guestTransferConn._dc;
+  let i = 0;
+  function next() {
+    if (i >= indices.length) {
+      try { guestTransferConn.send({ type: 'file_done', name: myName }); } catch(e) {}
+      return;
+    }
+    if (dc && dc.bufferedAmount > 524288) { setTimeout(next, 50); return; }
+    const seq = indices[i++];
+    const start = seq * CHUNK;
+    guestTransferBlob.slice(start, start + CHUNK).arrayBuffer()
+      .then(chunk => {
+        guestTransferConn.send({ type: 'file_chunk', seq, chunk });
+        next();
+      })
+      .catch(() => showGuestTransferFailed('Could not resend missing audio chunks. Download your backup and send it manually.'));
+  }
+  next();
+}
+
 function showGuestTransferFailed(msg) {
+  if (peers['host']) peers['host'].transferring = false;
   const c = $('guestUploadCard'); if (c) c.style.display = 'none';
   setText($('guestStatusDisplay'), 'Transfer failed — download your backup below');
   const backupBtn = $('guestBackupDownloadBtn');
@@ -1982,9 +2086,9 @@ function updateTransferBar(peerId, pctVal) {
 // P7: Verify chunk count before marking complete
 async function finaliseGuestTrack(peerId, conn) {
   const p = peers[peerId]; if (!p) return;
-  if (peers[peerId]) peers[peerId].transferring = false;
   const allChunks = receivedChunks[peerId];
   const meta = receivedMeta[peerId] || {};
+  if (meta.finalised) return;
 
   if (!allChunks || allChunks.length === 0) {
     conn.send({ type: 'transfer_failed' });
@@ -1992,14 +2096,22 @@ async function finaliseGuestTrack(peerId, conn) {
     return;
   }
 
-  // P7: Verify received count matches expected
-  if (meta.totalChunks && allChunks.length < meta.totalChunks * 0.95) {
-    // Allow 5% tolerance for timing
-    hostSystemMsg(`⚠ ${p.name}'s track may be incomplete (${allChunks.length}/${meta.totalChunks} chunks). Saving what arrived.`);
+  if (meta.totalChunks) {
+    const missing = [];
+    for (let i = 0; i < meta.totalChunks; i++) {
+      if (!allChunks[i]) missing.push(i);
+    }
+    if (missing.length > 0) {
+      hostSystemMsg(`Waiting for ${missing.length} missing audio chunk${missing.length === 1 ? '' : 's'} from ${p.name}…`);
+      try { conn.send({ type: 'chunk_resend', indices: missing }); } catch(e) {}
+      return;
+    }
   }
 
   const mimeType = meta.mimeType || 'audio/webm';
   const blob = new Blob(allChunks.map(c => new Uint8Array(c)), { type: mimeType });
+  meta.finalised = true;
+  if (peers[peerId]) peers[peerId].transferring = false;
   const b = $(`tbar-${peerId}`); if (b) { b.style.width = '100%'; b.style.background = 'var(--green)'; }
   const e = $(`tpct-${peerId}`); if (e) { const done = document.createElement('span'); done.className = 'transfer-done'; done.textContent = '✓'; e.innerHTML = ''; e.appendChild(done); }
 
@@ -2020,29 +2132,13 @@ async function buildHostDownload() {
   const rawBlob = new Blob(rawChunks, { type: 'audio/webm' });
   const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
   const safe = (myName || 'Host').replace(/[^a-zA-Z0-9]/g, '_');
-
-  try {
-    const ctx = new AudioContext({ sampleRate: 48000 });
-    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
-    const mp3Blob = await encodeMp3Room(decoded, 256);
-    const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
-    addDownloadItem(
-      'Host track',
-      `MP3 · ${sizeMb} MB`,
-      URL.createObjectURL(mp3Blob),
-      `${safe}_HOST_${ts}.mp3`
-    );
-  } catch(e) {
-    // Fallback to raw WebM if MP3 encoding fails
-    console.warn('Host MP3 encode failed, offering WebM:', e);
-    const sizeMb = (rawBlob.size / 1048576).toFixed(1);
-    addDownloadItem(
-      'Host track',
-      `WebM · ${sizeMb} MB`,
-      URL.createObjectURL(rawBlob),
-      `${safe}_HOST_${ts}.webm`
-    );
-  }
+  const sizeMb = (rawBlob.size / 1048576).toFixed(1);
+  addDownloadItem(
+    'Host track',
+    `WebM Opus · ${sizeMb} MB`,
+    URL.createObjectURL(rawBlob),
+    `${safe}_HOST_${ts}.webm`
+  );
   if ($('dlSection')) $('dlSection').style.display = 'block';
 }
 
@@ -2050,28 +2146,13 @@ async function buildCombinedDownload() {
   if (!combinedChunks || combinedChunks.length === 0) return;
   const rawBlob = new Blob(combinedChunks, { type: 'audio/webm' });
   const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-
-  try {
-    const ctx = new AudioContext({ sampleRate: 48000 });
-    const decoded = await ctx.decodeAudioData(await rawBlob.arrayBuffer());
-    const mp3Blob = await encodeMp3Room(decoded, 256);
-    const sizeMb = (mp3Blob.size / 1048576).toFixed(1);
-    addDownloadItem(
-      'All participants mix',
-      `MP3 · ${sizeMb} MB`,
-      URL.createObjectURL(mp3Blob),
-      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.mp3`
-    );
-  } catch(e) {
-    console.warn('Combined mix MP3 encode failed, offering WebM:', e);
-    const sizeMb = (rawBlob.size / 1048576).toFixed(1);
-    addDownloadItem(
-      'All participants mix',
-      `WebM · ${sizeMb} MB`,
-      URL.createObjectURL(rawBlob),
-      `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`
-    );
-  }
+  const sizeMb = (rawBlob.size / 1048576).toFixed(1);
+  addDownloadItem(
+    'All participants mix',
+    `WebM Opus · ${sizeMb} MB`,
+    URL.createObjectURL(rawBlob),
+    `VOX5000_ALL_PARTICIPANTS_MIX_${ts}.webm`
+  );
   if ($('dlSection')) $('dlSection').style.display = 'block';
 }
 

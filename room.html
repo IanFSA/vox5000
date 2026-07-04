@@ -58,7 +58,7 @@
 
       <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Output Volume</div>
       <div class="level-slider-row" style="margin-bottom:4px;">
-        <input type="range" id="settingsOutputSlider" class="level-slider" min="0" max="2" step="0.05" value="1" style="flex:1;" aria-label="Output volume" />
+        <input type="range" id="settingsOutputSlider" class="level-slider" min="0" max="1" step="0.05" value="1" style="flex:1;" aria-label="Output volume" />
         <span class="level-slider-val" id="settingsOutputVal">100%</span>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:20px;">Volume of incoming guest audio in your headphones</div>
@@ -111,7 +111,7 @@
     <div class="screen-card">
       <img src="logo.png" alt="VOX5000" style="height:26px;margin-bottom:28px;" />
       <h2 class="screen-title" style="color:var(--red);">⚠ Feedback Warning</h2>
-      <p class="screen-sub">Without headphones your speakers will cause echo and feedback that ruins the recording for everyone. Please put on headphones before continuing.</p>
+      <p class="screen-sub">Headphones are strongly recommended because speakers can create echo and feedback. If you continue with speakers, keep volume low and VOX5000 will turn echo cancellation on.</p>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button class="btn btn-record" id="nowHasHeadphones" style="justify-content:center;">✓ I've put headphones on — continue</button>
         <button class="btn btn-ghost" id="continueAnyway" style="justify-content:center;color:var(--red);border-color:rgba(255,59,59,0.3);">Continue anyway (not recommended)</button>
