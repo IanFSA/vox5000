@@ -61,6 +61,7 @@ let roomId   = urlCode || null;
 // Vercel endpoint. The endpoint returns [] until TURN env vars are configured.
 // Without TURN, some users behind strict corporate firewalls may fail to connect.
 const TURN_CREDENTIALS_URL = window.VOX5000_TURN_CREDENTIALS_URL || '/api/turn-credentials';
+let turnRelayAvailable = false;
 
 async function getIceServers() {
   const base = [
@@ -71,11 +72,20 @@ async function getIceServers() {
   try {
     const r = await fetch(TURN_CREDENTIALS_URL, { cache: 'no-store' });
     if (!r.ok && r.status !== 204) throw new Error(`TURN endpoint returned ${r.status}`);
-    if (r.status === 204) return base;
+    if (r.status === 204) {
+      turnRelayAvailable = false;
+      return base;
+    }
     const creds = await r.json();
-    return [...base, ...(Array.isArray(creds) ? creds : [])]; // merge STUN + TURN
+    const turnServers = Array.isArray(creds) ? creds : [];
+    turnRelayAvailable = turnServers.some(server => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      return urls.some(url => String(url || '').startsWith('turn:') || String(url || '').startsWith('turns:'));
+    });
+    return [...base, ...turnServers]; // merge STUN + TURN
   } catch(e) {
     console.warn('Could not fetch TURN credentials, falling back to STUN only:', e);
+    turnRelayAvailable = false;
     return base;
   }
 }
@@ -107,6 +117,8 @@ let hostSelfMuted = false;
 const consentLog = [];
 let hostReturning = false;
 let settingsPanelBound = false;
+let guestConnectAttempt = 0;
+let guestConnectTimer = null;
 
 // ── Helpers ──
 function fmt(s) {
@@ -382,6 +394,51 @@ function showLoadingThenHostRoom() {
   initPeer(`HOST-${roomId}`);
 }
 
+function showGuestConnectionProblem(message) {
+  setText($('waitingTitle'), 'Could not reach host');
+  setText($('waitingSub'), message || 'Ask the host to confirm the room is open, then try reconnecting.');
+  const rb = $('guestRejoinBtn');
+  if (rb) rb.style.display = 'block';
+}
+
+function resetGuestHostConnection() {
+  clearTimeout(guestConnectTimer);
+  guestConnectTimer = null;
+  const existing = peers['host'] && peers['host'].conn;
+  if (existing) {
+    try { existing.close(); } catch(e) {}
+  }
+  delete peers['host'];
+}
+
+function restartGuestPeer() {
+  resetGuestHostConnection();
+  if (peer && !peer.destroyed) {
+    try { peer.destroy(); } catch(e) {}
+  }
+  initPeer(`GUEST-${roomId}-${randId(4)}`);
+}
+
+function updateRoomHealth() {
+  const el = $('roomHealth');
+  if (!el) return;
+  el.textContent = turnRelayAvailable
+    ? 'Room online. Relay support is active for guests on difficult networks.'
+    : 'Room online. Relay support is not configured, so some guests on restrictive Wi-Fi may need to try another network.';
+}
+
+function setupWaitingControls() {
+  const rejoinBtn = $('guestRejoinBtn');
+  if (!rejoinBtn || rejoinBtn.dataset.bound === '1') return;
+  rejoinBtn.dataset.bound = '1';
+  rejoinBtn.addEventListener('click', () => {
+    rejoinBtn.style.display = 'none';
+    setText($('waitingTitle'), 'Reconnecting…');
+    setText($('waitingSub'), 'Making a fresh connection to the host.');
+    restartGuestPeer();
+  });
+}
+
 // ── PeerJS ──
 async function initPeer(id) {
   myPeerId = id;
@@ -439,10 +496,12 @@ async function initPeer(id) {
       setText($('waitingSub'), 'Please refresh and try again.');
       return;
     }
-    if (!isHost && err.type === 'peer-unavailable') {
-      guestSystemMsg('Could not reach the host room. Check the link and try again.');
-      const rb = $('guestRejoinBtn');
-      if (rb) rb.style.display = 'block';
+    if (!isHost) {
+      const msg = err.type === 'peer-unavailable'
+        ? 'Could not reach the host room. Check that the host has the room open, then try again.'
+        : 'The room connection could not be opened. Try reconnecting.';
+      guestSystemMsg(msg);
+      showGuestConnectionProblem(msg);
     }
   });
   peer.on('disconnected', () => {
@@ -473,11 +532,31 @@ function getMic() {
 
 // ── Guest → Host ──
 function connectToHost() {
+  resetGuestHostConnection();
+  guestConnectAttempt += 1;
+  const attempt = guestConnectAttempt;
   setText($('waitingTitle'), 'Connecting to host…');
   setText($('waitingSub'), 'Opening the room link. Keep this page open.');
+  const rb = $('guestRejoinBtn');
+  if (rb) rb.style.display = 'none';
   const conn = peer.connect(`HOST-${roomId}`, { reliable: true });
   let joinAcked = false;
+  let opened = false;
+
+  guestConnectTimer = setTimeout(() => {
+    if (attempt !== guestConnectAttempt || opened) return;
+    try { conn.close(); } catch(e) {}
+    const relayHint = turnRelayAvailable
+      ? ''
+      : ' This can happen on restrictive Wi-Fi if relay support is not configured.';
+    showGuestConnectionProblem(`The guest link did not reach the host.${relayHint} Ask the host to keep the room open, then try reconnecting.`);
+  }, 9000);
+
   conn.on('open', () => {
+    if (attempt !== guestConnectAttempt) return;
+    opened = true;
+    clearTimeout(guestConnectTimer);
+    guestConnectTimer = null;
     conn.send({ type: 'join_request', name: myName, peerId: myPeerId, consented: myConsented, observer: myIsObserver });
     peers['host'] = { conn, name: 'Host', transferring: false };
     setText($('waitingTitle'), 'Waiting to be admitted');
@@ -491,22 +570,24 @@ function connectToHost() {
     }, 10000);
   });
   conn.on('data', data => {
+    if (attempt !== guestConnectAttempt) return;
     if (data.type === 'join_ack') joinAcked = true;
     handleHostMessage(data, conn);
   });
   conn.on('close', () => {
-    setText($('waitingTitle'), 'Could not reach host');
-    setText($('waitingSub'), 'The room connection closed. Ask the host to confirm the room is open, then try reconnecting.');
+    if (attempt !== guestConnectAttempt) return;
+    clearTimeout(guestConnectTimer);
+    guestConnectTimer = null;
+    if (joinAcked) return;
+    showGuestConnectionProblem('The room connection closed before the host received your request. Ask the host to confirm the room is open, then try reconnecting.');
     guestSystemMsg('Disconnected from host.');
-    const rb = $('guestRejoinBtn');
-    if (rb) rb.style.display = 'block';
   });
   conn.on('error', err => {
+    if (attempt !== guestConnectAttempt) return;
+    clearTimeout(guestConnectTimer);
+    guestConnectTimer = null;
     console.error('Guest conn error:', err);
-    setText($('waitingTitle'), 'Could not reach host');
-    setText($('waitingSub'), 'The room link did not connect. Check the link and try again.');
-    const rb = $('guestRejoinBtn');
-    if (rb) rb.style.display = 'block';
+    showGuestConnectionProblem('The room link did not connect. Check that the host has the room open, then try again.');
   });
 }
 
@@ -1199,6 +1280,7 @@ function showHostRoom() {
   setText($('roomCodeDisplay'), roomId);
   setText($('roomNameDisplay'), rd.name || 'Interview Room');
   document.title = `Vox5000 — ${rd.name || 'Interview Room'}`;
+  updateRoomHealth();
   getMic().then(s => setupHostAudioGraph(s));
   renderParticipants();
   setupHostControls();
@@ -1797,13 +1879,7 @@ function setupGuestControls() {
   }
 
   const rejoinBtn = $('guestRejoinBtn');
-  if (rejoinBtn) {
-    rejoinBtn.addEventListener('click', () => {
-      rejoinBtn.style.display = 'none';
-      if (peer && !peer.destroyed) { try { peer.reconnect(); } catch(e) {} }
-      else initPeer(`GUEST-${roomId}-${randId(4)}`);
-    });
-  }
+  if (rejoinBtn) setupWaitingControls();
 
   const backupBtn = $('guestBackupDownloadBtn');
   if (backupBtn) {
@@ -2330,6 +2406,7 @@ function broadcastToGuests(data, excludePeer) {
 
 // ── Boot ──
 setupNav();
+setupWaitingControls();
 
 if (isHost && roomId && checkHostReturn()) {
   if ($('headphoneScreen')) $('headphoneScreen').style.display = 'none';

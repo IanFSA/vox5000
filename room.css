@@ -316,6 +316,17 @@
   grid-template-columns: 36px minmax(0, 1fr);
 }
 
+.room-health {
+  margin: -4px 0 16px;
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.room-health strong {
+  color: var(--yellow);
+}
+
 .guest-alert {
   position: fixed;
   inset: 0;
