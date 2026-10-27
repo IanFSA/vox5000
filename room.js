@@ -2388,6 +2388,11 @@ async function finaliseGuestTrack(peerId, conn) {
 
   const mimeType = meta.mimeType || 'audio/webm';
   const blob = new Blob(allChunks.map(c => new Uint8Array(c)), { type: mimeType });
+  if (Number.isFinite(meta.size) && blob.size !== meta.size) {
+    hostSystemMsg('Transfer size mismatch for ' + p.name + '. Expected ' + meta.size + ' bytes; received ' + blob.size + '. Do not use this file.');
+    try { conn.send({ type: 'transfer_failed' }); } catch(e) {}
+    return;
+  }
   meta.finalised = true;
   if (peers[peerId]) peers[peerId].transferring = false;
   const b = $(`tbar-${peerId}`); if (b) { b.style.width = '100%'; b.style.background = 'var(--green)'; }
