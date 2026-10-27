@@ -128,7 +128,15 @@ function mount() {
   description.textContent='Recordings are saved in this browser on this device. Download important recordings before clearing browser data. Recoveries may be incomplete if the microphone or browser stopped.';
   const warning=document.createElement('p');warning.id='voxRecoveryError';warning.style.color='#ffac66';
   const list=document.createElement('div');list.id='voxRecoveryList';
-  details.append(summary,description,warning,list);wrap.append(details);document.body.append(wrap);
+  const emergency=document.createElement('button');
+  emergency.type='button';emergency.textContent='Emergency stop and save guest recording';
+  emergency.style.cssText='margin:10px 0;padding:9px;background:#754000;color:white;border:1px solid #aa7a3c;border-radius:4px';
+  emergency.onclick=()=>{
+    if(!confirm('Stop your local guest recording now? Use only if the host is unreachable.'))return;
+    if(!window.VOXEmergencyStopGuest?.())alert('No active guest recording was found.');
+    refresh();
+  };
+  details.append(summary,description,emergency,warning,list);wrap.append(details);document.body.append(wrap);
   details.addEventListener('toggle',()=>{if(details.open)refresh();});
   refresh();
 }
