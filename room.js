@@ -418,6 +418,7 @@ function resetGuestHostConnection() {
 }
 
 function restartGuestPeer() {
+  // A guest's local MediaRecorder must never be reset during a signalling failure.
   resetGuestHostConnection();
   if (peer && !peer.destroyed) {
     try { peer.destroy(); } catch(e) {}
@@ -677,7 +678,11 @@ function connectToHost() {
     if (attempt !== guestConnectAttempt) return;
     clearTimeout(guestConnectTimer);
     guestConnectTimer = null;
-    if (joinAcked) return;
+    if (joinAcked) {
+      guestSystemMsg('Host connection lost. Local recording continues if active. Rejoin the room to restore communication.');
+      const rb = $('guestRejoinBtn'); if (rb) rb.style.display = 'block';
+      return;
+    }
     showGuestConnectionProblem('The room connection closed before the host received your request. Ask the host to confirm the room is open, then try reconnecting.');
     guestSystemMsg('Disconnected from host.');
   });
@@ -695,6 +700,10 @@ function handleHostMessage(data, conn) {
     if ($('waitingScreen')) $('waitingScreen').style.display = 'none';
     showGuestRoom();
     guestSystemMsg(`You are in the room${myIsObserver ? ' as an Observer (mic off, not recorded)' : ''}.`);
+    if (!recording && guestTransferBlob && !transferComplete && conn.open) {
+      guestSystemMsg('Connection restored. Restarting transfer of the locally preserved recording.');
+      sendFileToHost(conn, guestTransferBlob, guestTransferMimeType);
+    }
   }
   if (data.type === 'chunk_resend') {
     resendRequestedChunks(data.indices || []);
@@ -712,7 +721,7 @@ function handleHostMessage(data, conn) {
     if (data.hostEpoch) recordingStartedEpoch = data.hostEpoch;
     if ($('countdownScreen')) $('countdownScreen').style.display = 'none';
     if ($('guestRoom')) $('guestRoom').style.display = 'block';
-    if (!myIsObserver && (!mediaRecorder || mediaRecorder.state === 'inactive')) startGuestRecording();
+    if (!myIsObserver && !recording && (!mediaRecorder || mediaRecorder.state === 'inactive')) startGuestRecording();
     setText($('guestStatusDisplay'), '🔴 Recording');
     setText($('guestMicStatus'), 'Active — speak to see your level');
   }
@@ -2182,7 +2191,12 @@ function sendFileToHost(hostConn, blob, mimeType) {
   const totalChunks = Math.ceil(blob.size / CHUNK);
   if (peers['host']) peers['host'].transferring = true;
   const startOffsetMs = (recordingStartedEpoch && localRecordStartedEpoch) ? Math.max(0, localRecordStartedEpoch - recordingStartedEpoch) : null;
-  hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType, startOffsetMs });
+  if (!hostConn || !hostConn.open) {
+    showGuestTransferFailed('Connection lost. Rejoin to retry the transfer or download your local backup.');
+    return;
+  }
+  try { hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType, startOffsetMs }); }
+  catch(e) { showGuestTransferFailed('Transfer could not start. Rejoin and retry.'); return; }
 
   let offset = 0, seq = 0, sending = false, waitingBuf = false;
   const dc = hostConn.dataChannel || hostConn._dc;
@@ -2208,11 +2222,21 @@ function sendFileToHost(hostConn, blob, mimeType) {
   function schedule() { setTimeout(next, 8); }
   function next() {
     if (sending) return;
+    if (!hostConn.open || dc.readyState !== 'open') {
+      clearInterval(transferTimeout);
+      showGuestTransferFailed('Connection lost during transfer. Rejoin to retry or download your local backup.');
+      return;
+    }
     if (offset >= blob.size) {
       clearInterval(transferTimeout);
       function waitDrain() {
+        if (!hostConn.open || dc.readyState !== 'open') {
+          showGuestTransferFailed('Connection lost while confirming transfer. Rejoin to retry.');
+          return;
+        }
         if (dc && dc.bufferedAmount > 0) { setTimeout(waitDrain, 50); return; }
-        hostConn.send({ type: 'file_done', name: myName });
+        try { hostConn.send({ type: 'file_done', name: myName }); }
+        catch(e) { showGuestTransferFailed('Transfer confirmation failed. Rejoin to retry.'); return; }
         setText($('guestStatusDisplay'), 'Sent — waiting for confirmation from host…');
       }
       setTimeout(waitDrain, 150);
