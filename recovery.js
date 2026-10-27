@@ -13,7 +13,7 @@ function db() {
     };
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
-  });
+  }).catch(err => { dbPromise = null; throw err; });
   return dbPromise;
 }
 function transact(store, mode, action) {
@@ -47,6 +47,7 @@ const active = new Map();
 function begin(role, room, mime) {
   const id=[Date.now(),crypto.randomUUID()].join('-');
   const state={id,seq:0,pending:Promise.resolve(),error:null};
+  if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   active.set(role,state);
   state.pending=state.pending.then(()=>transact(META,'readwrite',s=>s.put({
     id,role,room,mime:mime||'audio/webm',created:Date.now(),status:'recording',count:0
@@ -67,7 +68,8 @@ async function finish(role) {
   const state=active.get(role);
   if(!state) return;
   await state.pending;
-  if(!state.error) await transact(META,'readwrite',s=>{
+  if(state.error) { active.delete(role); await refresh(); throw state.error; }
+  await transact(META,'readwrite',s=>{
     const req=s.get(state.id);
     req.onsuccess=()=>{if(req.result) s.put({...req.result,status:'stopped',count:state.seq});};
   });
