@@ -2142,12 +2142,16 @@ function stopGuestRecording(hostConn) {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
     recording = false;
     paused = false;
-    encodeAndSendToHost(hostConn); return;
+    window.VOXRecovery?.finish('guest').catch(e => guestSystemMsg('Local backup warning: ' + e.message))
+      .finally(() => encodeAndSendToHost(hostConn));
+    return;
   }
   mediaRecorder.onstop = () => {
     recording = false;
     paused = false;
-    window.VOXRecovery?.finish('guest').then(() => encodeAndSendToHost(hostConn));
+    window.VOXRecovery?.finish('guest').catch(e => {
+      guestSystemMsg('WARNING: Durable backup failed: ' + e.message + '. Download your track before leaving.');
+    }).finally(() => encodeAndSendToHost(hostConn));
   };
   mediaRecorder.stop();
 }
