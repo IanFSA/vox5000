@@ -2026,6 +2026,7 @@ function beginRecording() {
   recordingStartedEpoch = Date.now();
   localRecordStartedEpoch = recordingStartedEpoch;
   chunks = []; rawChunks = [];
+  window.VOXRecovery?.begin('host', roomId, 'audio/webm');
   recording = true; paused = false; elapsed = 0;
   startTime = Date.now();
   timerInterval = setInterval(tickTimer, 500);
@@ -2094,13 +2095,13 @@ function startLocalRecording() {
   const opts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 256000 } : {};
   mediaRecorder = new MediaRecorder(processedDest.stream, opts);
-  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) { chunks.push(e.data); rawChunks.push(e.data); } };
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) { chunks.push(e.data); rawChunks.push(e.data); window.VOXRecovery?.append(isHost ? 'host' : 'guest', e.data); } };
   mediaRecorder.start(1000);
 }
 
 function stopLocalRecording(cb) {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') { if (cb) cb(); return; }
-  mediaRecorder.onstop = () => { if (cb) cb(); };
+  mediaRecorder.onstop = async () => { await window.VOXRecovery?.finish('host'); if (cb) cb(); };
   mediaRecorder.stop();
 }
 
@@ -2109,6 +2110,7 @@ function startGuestRecording() {
   if (!processedDest) { guestSystemMsg('⚠ Mic not ready — your audio may not be recorded.'); return; }
   localRecordStartedEpoch = Date.now();
   chunks = []; rawChunks = [];
+  window.VOXRecovery?.begin('guest', roomId, 'audio/webm');
   guestBackupBlob = null;
   guestTransferBlob = null;
   guestTransferConn = null;
@@ -2119,7 +2121,7 @@ function startGuestRecording() {
     ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 256000 } : {};
   // P3: record processed stream
   mediaRecorder = new MediaRecorder(processedDest.stream, opts);
-  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) { chunks.push(e.data); rawChunks.push(e.data); } };
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) { chunks.push(e.data); rawChunks.push(e.data); window.VOXRecovery?.append(isHost ? 'host' : 'guest', e.data); } };
   mediaRecorder.start(1000);
   if ($('guestTimerCard')) $('guestTimerCard').style.display = 'block';
   const oa = $('onAir'); if (oa) oa.classList.add('visible');
@@ -2137,7 +2139,7 @@ function stopGuestRecording(hostConn) {
   mediaRecorder.onstop = () => {
     recording = false;
     paused = false;
-    encodeAndSendToHost(hostConn);
+    window.VOXRecovery?.finish('guest').then(() => encodeAndSendToHost(hostConn));
   };
   mediaRecorder.stop();
 }
