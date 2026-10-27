@@ -102,6 +102,9 @@ const remoteStreams = {};
 let peer;
 const peers = {}; // peerId → { conn, call, name, pending, consented, observer, muted, selfMuted, analyser }
 const receivedChunks = {}, receivedMeta = {};
+// Transfer sessions survive guest PeerJS ID changes while this host tab remains open.
+const receivedByTransferId = new Map();
+let guestTransferId = null;
 let guestBackupBlob = null;
 let guestTransferBlob = null;
 let guestTransferMimeType = 'audio/webm';
@@ -701,9 +704,12 @@ function handleHostMessage(data, conn) {
     showGuestRoom();
     guestSystemMsg(`You are in the room${myIsObserver ? ' as an Observer (mic off, not recorded)' : ''}.`);
     if (!recording && guestTransferBlob && !transferComplete && conn.open) {
-      guestSystemMsg('Connection restored. Restarting transfer of the locally preserved recording.');
+      guestSystemMsg('Connection restored. Resuming transfer of the locally preserved recording.');
       sendFileToHost(conn, guestTransferBlob, guestTransferMimeType);
     }
+  }
+  if (data.type === 'file_resume') {
+    if (window.voxTransferResume) window.voxTransferResume(data);
   }
   if (data.type === 'chunk_resend') {
     resendRequestedChunks(data.indices || []);
@@ -800,8 +806,13 @@ function handleIncomingConn(conn) {
     }
     // P7: Receive raw WebM chunks — no MP3 conversion required
     if (data.type === 'file_meta') {
-      receivedMeta[conn.peer] = { ...data, done: false, finalised: false };
-      receivedChunks[conn.peer] = [];
+      const prior = data.transferId && receivedByTransferId.get(data.transferId);
+      const compatible = prior && prior.meta.size === data.size && prior.meta.totalChunks === data.totalChunks;
+      const stored = compatible ? prior : { meta: { ...data, done: false, finalised: false }, chunks: [] };
+      receivedMeta[conn.peer] = stored.meta;
+      receivedChunks[conn.peer] = stored.chunks;
+      if (data.transferId) receivedByTransferId.set(data.transferId, stored);
+      try { conn.send({ type: 'file_resume', transferId: data.transferId, received: stored.chunks.map((c,i) => c ? i : -1).filter(i => i >= 0) }); } catch(e) {}
       if (peers[conn.peer]) peers[conn.peer].transferring = true;
       addTransferRow(conn.peer, peers[conn.peer] ? peers[conn.peer].name : 'Guest', data.size, data.totalChunks);
     }
@@ -2131,6 +2142,7 @@ function startGuestRecording() {
   guestBackupBlob = null;
   guestTransferBlob = null;
   guestTransferConn = null;
+  guestTransferId = crypto.randomUUID();
   transferComplete = false;
   recording = true;
   paused = false;
@@ -2195,10 +2207,22 @@ function sendFileToHost(hostConn, blob, mimeType) {
     showGuestTransferFailed('Connection lost. Rejoin to retry the transfer or download your local backup.');
     return;
   }
-  try { hostConn.send({ type: 'file_meta', name: myName, totalChunks, size: blob.size, mimeType, startOffsetMs }); }
+  guestTransferId ||= crypto.randomUUID();
+  try { hostConn.send({ type: 'file_meta', transferId: guestTransferId, name: myName, totalChunks, size: blob.size, mimeType, startOffsetMs }); }
   catch(e) { showGuestTransferFailed('Transfer could not start. Rejoin and retry.'); return; }
 
   let offset = 0, seq = 0, sending = false, waitingBuf = false;
+  // Wait for the host's resume manifest, so already received chunks need not be resent.
+  let resumeReady = false;
+  let acknowledged = new Set();
+  const resumeTimer = setTimeout(() => { if (!resumeReady) { resumeReady = true; schedule(); } }, 5000);
+  window.voxTransferResume = data => {
+    if (data.transferId !== guestTransferId || resumeReady) return;
+    resumeReady = true;
+    clearTimeout(resumeTimer);
+    acknowledged = new Set(Array.isArray(data.received) ? data.received.filter(i => Number.isInteger(i) && i >= 0 && i < totalChunks) : []);
+    schedule();
+  };
   const dc = hostConn.dataChannel || hostConn._dc;
   if (!dc) {
     showGuestTransferFailed('Browser data channel was not ready. Download your backup and send it manually.');
@@ -2221,7 +2245,8 @@ function sendFileToHost(hostConn, blob, mimeType) {
 
   function schedule() { setTimeout(next, 8); }
   function next() {
-    if (sending) return;
+    if (sending || !resumeReady) return;
+    while (seq < totalChunks && acknowledged.has(seq)) { seq += 1; offset = Math.min(blob.size, seq * CHUNK); }
     if (!hostConn.open || dc.readyState !== 'open') {
       clearInterval(transferTimeout);
       showGuestTransferFailed('Connection lost during transfer. Rejoin to retry or download your local backup.');
@@ -2260,7 +2285,7 @@ function sendFileToHost(hostConn, blob, mimeType) {
       schedule();
     }).catch(() => { sending = false; clearInterval(transferTimeout); showGuestTransferFailed(); });
   }
-  schedule();
+  // The resume response or 5-second fallback starts sending.
 }
 
 function resendRequestedChunks(indices) {
