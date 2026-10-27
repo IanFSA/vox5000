@@ -2105,6 +2105,14 @@ function stopLocalRecording(cb) {
   mediaRecorder.stop();
 }
 
+// A disconnected guest can end local capture safely without a host command.
+window.VOXEmergencyStopGuest = function() {
+  if (isHost || !recording || !mediaRecorder || mediaRecorder.state === 'inactive') return false;
+  const connection = peers['host'] && peers['host'].conn;
+  stopGuestRecording(connection && connection.open ? connection : null);
+  return true;
+};
+
 // ── Guest recording ──
 function startGuestRecording() {
   if (!processedDest) { guestSystemMsg('⚠ Mic not ready — your audio may not be recorded.'); return; }
@@ -2158,6 +2166,10 @@ async function encodeAndSendToHost(hostConn) {
   guestTransferMimeType = 'audio/webm';
   guestTransferConn = hostConn;
   setText($('guestUploadPct'), 'Sending…');
+  if (!hostConn || !hostConn.open) {
+    showGuestTransferFailed('Host connection unavailable. Your local audio remains available in Local recording recovery.');
+    return;
+  }
   sendFileToHost(hostConn, rawBlob, 'audio/webm');
 }
 
